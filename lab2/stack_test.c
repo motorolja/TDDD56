@@ -175,7 +175,7 @@ test_push_safe()
   // check other properties expected after a push operation
   // (this is to be updated as your stack design progresses)
   // iterate through the stack and see if there are 20 values with the threads id
-  
+
   int result;
   unsigned int counter = 0;
   stack_element_t* current_ele = stack->head;
@@ -205,10 +205,39 @@ test_push_safe()
 int
 test_pop_safe()
 {
-  // Same as the test above for parallel pop operation
+  int i;
+  // get the thread id
+  unsigned int start, end, iterations = 20;
+  unsigned int tid = (unsigned int)pthread_self();
+  // add some constant dependent on tid
+  start = (unsigned int)tid * 100;
+  end = start + iterations;
+  for (i = 0; i < iterations; ++i)
+    {
+      stack_pop(stack);
+    }
 
-  // For now, this test always fails
-  return 0;
+  // check if the stack is in a consistent state
+  stack_check(stack);
+  //printf("My thread id: %d \n", tid);
+  // check other properties expected after a push operation
+  // (this is to be updated as your stack design progresses)
+  // iterate through the stack and see if there are 0 values with the threads id
+
+  int result = 1;
+  stack_element_t* current_ele = stack->head;
+  while (current_ele != NULL)
+    {
+      // if we find a value added by this thread increment counter
+      if (current_ele->value >= start && current_ele->value <= end)
+        {
+          result = 0;
+          break;
+        }
+      current_ele = current_ele->next;
+    }
+
+  return result;
 }
 
 // 3 Threads should be enough to raise and detect the A0BA problem
