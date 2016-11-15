@@ -71,7 +71,7 @@ stack_push(stack_t *s, stack_element_t *e)
 
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
-  unsigned int result;
+  size_t result;
   stack_element_t* old;
   do
     {
@@ -80,8 +80,8 @@ stack_push(stack_t *s, stack_element_t *e)
       // set new element to point towards current head
       e->next = s->head;
       // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes
-      result = cas((unsigned int*)& s->head, (unsigned int*) old, (unsigned int*) e);
-    } while (result != (unsigned int) old);
+      result = cas((size_t *)& s->head, (size_t) old, (size_t) e);
+    } while (result != (size_t) old);
 
 #else
   /*** Optional ***/
@@ -112,7 +112,7 @@ stack_pop(stack_t *s)
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
   stack_element_t* old;
-  unsigned int result;
+  size_t result;
   do
     {
       // get current head
@@ -120,8 +120,8 @@ stack_pop(stack_t *s)
       // set popped element to point towards current head
       popped = s->head;
       // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes.
-      result = cas((unsigned int*)& s->head, (unsigned int) old, (unsigned int) popped->next);
-    } while (result != (unsigned int) old);
+      result = cas((size_t *)& s->head, (size_t) old, (size_t) popped->next);
+    } while (result != (size_t) old);
 #else
   /*** Optional ***/
   // Implement a software CAS-based stack
