@@ -59,13 +59,27 @@ stack_check(stack_t *stack)
 #endif
 }
 
-int /* Return the type you prefer */
-stack_push(/* Make your own signature */)
+void /* Return the type you prefer */
+stack_push(stack_t *s, stack_element_t *e)
 {
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
+  pthread_mutex_lock(&s->glock);
+  e->next = s->head;
+  s->head = e;
+  pthread_mutex_unlock(&s->glock);
+
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
+  /*
+    do
+    {
+    e->next = ->
+
+    } while ();
+
+   */
+
 #else
   /*** Optional ***/
   // Implement a software CAS-based stack
@@ -75,22 +89,23 @@ stack_push(/* Make your own signature */)
   // It doesn't harm performance as sanity check are disabled at measurement time
   // This is to be updated as your implementation progresses
   stack_check((stack_t*)1);
-
-  return 0;
 }
 
-int /* Return the type you prefer */
-stack_pop(/* Make your own signature */)
+void /* Return the type you prefer */
+stack_pop(stack_t *s)
 {
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
+  pthread_mutex_lock(&s->glock);
+  if (s->head->next != NULL) {
+    s->head = s->head->next;
+  }
+  pthread_mutex_unlock(&s->glock);
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
 #else
   /*** Optional ***/
   // Implement a software CAS-based stack
 #endif
-
-  return 0;
 }
 

@@ -86,7 +86,8 @@ stack_measure_push(void* arg)
   clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
   for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
     {
-        // See how fast your implementation can push MAX_PUSH_POP elements in parallel
+      // See how fast your implementation can push MAX_PUSH_POP elements in parallel
+
     }
   clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
 
@@ -112,8 +113,10 @@ test_setup()
   stack = malloc(sizeof(stack_t));
 
   // Reset explicitely all members to a well-known initial value
-  // For instance (to be deleted as your stack design progresses):
-  stack->change_this_member = 0;
+  /*
+    Note: I assumes that glock does not need to be initialized, may not be the case
+  */
+  stack->head = NULL;
 }
 
 void
@@ -137,14 +140,14 @@ test_push_safe()
   // several threads push concurrently to it
 
   // Do some work
-  stack_push(/* add relevant arguments here */);
+  //stack_push(/* add relevant arguments here */);
 
   // check if the stack is in a consistent state
   stack_check(stack);
 
   // check other properties expected after a push operation
   // (this is to be updated as your stack design progresses)
-  assert(stack->change_this_member == 0);
+  // assert(stack->head->value == 0);
 
   // For now, this test always fails
   return 0;

@@ -27,20 +27,29 @@
 #ifndef STACK_H
 #define STACK_H
 
+
+// A node, with a value and pointer to next node
+typedef struct stack_element
+{
+  int value;
+  struct stack_element* next;
+} stack_element_t;
+
 struct stack
 {
-  // This is a fake structure; change it to your needs
-  int change_this_member;
+  struct stack_element* head;
+  // Global lock for the stack
+  pthread_mutex_t glock;
 };
 typedef struct stack stack_t;
 
 // Pushes an element in a thread-safe manner
-int /* Return the type you prefer */
-stack_push(/* Make your own signature */);
+void /* Return the type you prefer */
+stack_push(stack_t *s, stack_element_t * e);
 
 // Pops an element in a thread-safe manner
-int /* Return the type you prefer */
-stack_pop(/* Make your own signature */);
+void /* Return the type you prefer */
+stack_pop(stack_t *s);
 
 
 
