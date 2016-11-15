@@ -212,11 +212,13 @@ test_pop_safe()
   // add some constant dependent on tid
   start = (unsigned int)tid * 100;
   end = start + iterations;
+  stack_element_t* tmp;
   for (i = 0; i < iterations; ++i)
     {
-      stack_pop(stack);
+      tmp = stack_pop(stack);
+      free(tmp);
     }
-
+y
   // check if the stack is in a consistent state
   stack_check(stack);
   //printf("My thread id: %d \n", tid);
@@ -250,6 +252,45 @@ test_aba()
   int success, aba_detected = 0;
   // Write here a test for the ABA problem
   success = aba_detected;
+  /*
+    A test case with 3 threads sharing a resource which is modified back and forth.
+    Will trigger the ABA problem
+   */
+  int i;
+  // get the thread id
+  unsigned int value = 4, iterations = 20;
+  // add some constant dependent on tid
+  for (i = 0; i < iterations; ++i)
+    {
+      stack_element_t* new_ele = malloc(sizeof(stack_element_t));
+      new_ele->value = i;
+      stack_push(stack, new_ele);
+    }
+  stack_element_t* tmp;
+  for (i = 0; i < iterations/2; ++i)
+    {
+      tmp = stack_pop(stack);
+      free(tmp);
+    }
+
+  for (i = 0; i < iterations + iterations/2; ++i)
+    {
+      stack_element_t* new_ele = malloc(sizeof(stack_element_t));
+      new_ele->value = value;
+      stack_push(stack, new_ele);
+    }
+  unsigned int counter = 0;
+  stack_element_t* current_pos = stack->head;
+  while (counter < iterations/2 - 1 && current_pos != NULL) {
+    counter++;
+    current_pos = current_pos->next;
+  }
+
+  if (current_pos->value == value)
+    {
+      success = 1;
+    }
+
   return success;
 #else
   // No ABA is possible with lock-based synchronization. Let the test succeed only
