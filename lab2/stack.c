@@ -71,18 +71,25 @@ stack_push(stack_t *s, stack_element_t *e)
 
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
-  /*
-    do
+  unsigned int result;
+  stack_element_t* old;
+  do
     {
-    e->next = ->
-
-    } while ();
-
-   */
+      // get current head
+      old = s->head;
+      // set new element to point towards current head
+      e->next = s->head;
+      // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes
+      result = cas((unsigned int*)& s->head, (unsigned int*) old, (unsigned int*) e);
+    } while (result != (unsigned int) old);
 
 #else
   /*** Optional ***/
   // Implement a software CAS-based stack
+  // pretty much the same as above but with atomic around what is suppose to happen in CAS
+  // ATOMIC();
+
+  // END_ATOMIC();
 #endif
 
   // Debug practice: you can check if this operation results in a stack in a consistent check
@@ -91,21 +98,38 @@ stack_push(stack_t *s, stack_element_t *e)
   stack_check((stack_t*)1);
 }
 
-void /* Return the type you prefer */
+stack_element_t* /* Return the type you prefer */
 stack_pop(stack_t *s)
 {
+  stack_element_t* popped;
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
   pthread_mutex_lock(&s->glock);
-  if (s->head->next != NULL) {
-    s->head = s->head->next;
-  }
+  // save the head before poping
+  popped = s->head;
+  s->head = s->head->next;
   pthread_mutex_unlock(&s->glock);
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
+  stack_element_t* old;
+  unsigned int result;
+  do
+    {
+      // get current head
+      old = s->head;
+      // set popped element to point towards current head
+      popped = s->head;
+      // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes.
+      result = cas((unsigned int*)& s->head, (unsigned int) old, (unsigned int) popped->next);
+    } while (result != (unsigned int) old);
 #else
   /*** Optional ***/
   // Implement a software CAS-based stack
+  // pretty much the same as above but with atomic around what is suppose to happen in CAS
+  // ATOMIC();
+
+  // END_ATOMIC();
 #endif
+  return popped;
 }
 

@@ -48,7 +48,7 @@ void /* Return the type you prefer */
 stack_push(stack_t *s, stack_element_t * e);
 
 // Pops an element in a thread-safe manner
-void /* Return the type you prefer */
+stack_element_t* /* Return the type you prefer */
 stack_pop(stack_t *s);
 
 

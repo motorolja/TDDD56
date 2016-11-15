@@ -71,9 +71,10 @@ stack_measure_pop(void* arg)
     for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
       {
         // See how fast your implementation can pop MAX_PUSH_POP elements in parallel
+        // just call pop
+        stack_pop(stack);
       }
     clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
-
     return NULL;
   }
 #elif MEASURE == 2
@@ -82,15 +83,16 @@ stack_measure_push(void* arg)
 {
   stack_measure_arg_t *args = (stack_measure_arg_t*) arg;
   int i;
-
+  stack_element_t new_ele;
+  new_ele.value = (unsigned int)pthread_self();
   clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
   for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
     {
       // See how fast your implementation can push MAX_PUSH_POP elements in parallel
-
+      // just call push with the a new element
+      stack_push(stack,&new_ele);
     }
   clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
-
   return NULL;
 }
 #endif
@@ -111,12 +113,20 @@ test_setup()
 
   // Allocate a new stack and reset its values
   stack = malloc(sizeof(stack_t));
-
+  stack->head = NULL; // empty so should not point anywhere
   // Reset explicitely all members to a well-known initial value
   /*
     Note: I assumes that glock does not need to be initialized, may not be the case
   */
-  stack->head = NULL;
+  // initialize the stack with predefined data
+  int i;
+  stack_element_t* tmp;
+  for (i = 0; i < MAX_PUSH_POP; ++i)
+    {
+      tmp = malloc(sizeof(stack_element_t));
+      tmp->value = i;
+      stack_push(stack,tmp);
+    }
 }
 
 void
@@ -124,6 +134,13 @@ test_teardown()
 {
   // Do not forget to free your stacks after each test
   // to avoid memory leaks
+  // just iterate through the stack and free all.
+  stack_element_t* tmp;
+  while (stack->head != NULL)
+    {
+      tmp = stack_pop(stack);
+      free(tmp);
+    }
   free(stack);
 }
 
@@ -138,19 +155,51 @@ test_push_safe()
 {
   // Make sure your stack remains in a good state with expected content when
   // several threads push concurrently to it
-
-  // Do some work
-  //stack_push(/* add relevant arguments here */);
+  int i;
+  // get the thread id
+  unsigned int start, end, iterations = 20;
+  unsigned int tid = (unsigned int)pthread_self();
+  // add some constant dependent on tid
+  start = (unsigned int)tid * 100;
+  end = start + iterations;
+  for (i = 0; i < iterations; ++i)
+    {
+      stack_element_t* new_ele = malloc(sizeof(stack_element_t));
+      new_ele->value = start+i;
+      stack_push(stack, new_ele);
+    }
 
   // check if the stack is in a consistent state
   stack_check(stack);
-
+  //printf("My thread id: %d \n", tid);
   // check other properties expected after a push operation
   // (this is to be updated as your stack design progresses)
+  // iterate through the stack and see if there are 20 values with the threads id
+  
+  int result;
+  unsigned int counter = 0;
+  stack_element_t* current_ele = stack->head;
+  for (i = 0; i < iterations * NB_THREADS; ++i)
+    {
+      // if we have not pushed all elements to the stack (race condition)
+      if (current_ele == NULL)
+        {
+          result = 0;
+        }
+      // if we find a value added by this thread increment counter
+      else if (current_ele->value >= start && current_ele->value <= end)
+        {
+          counter++;
+          if (counter == iterations)
+            {
+              result = 1;
+            }
+        }
+      current_ele = current_ele->next;
+    }
   // assert(stack->head->value == 0);
 
-  // For now, this test always fails
-  return 0;
+  return result;
 }
 
 int
@@ -162,7 +211,7 @@ test_pop_safe()
   return 0;
 }
 
-// 3 Threads should be enough to raise and detect the ABA problem
+// 3 Threads should be enough to raise and detect the A0BA problem
 #define ABA_NB_THREADS 3
 
 int

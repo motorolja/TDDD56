@@ -1,8 +1,8 @@
 FILES=Makefile non_blocking.c non_blocking.h stack.c stack.h stack_test.c compile run variables drawplots.r Questions/questions.pdf
 ARCHIVE=Lab2.zip
 
-NB_THREADS=3
-NON_BLOCKING=0
+NB_THREADS=4
+NON_BLOCKING=1
 SUFFIX=
 MEASURE=0
 MAX_PUSH_POP=5000
