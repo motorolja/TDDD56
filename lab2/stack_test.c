@@ -218,7 +218,6 @@ test_pop_safe()
       tmp = stack_pop(stack);
       free(tmp);
     }
-y
   // check if the stack is in a consistent state
   stack_check(stack);
   //printf("My thread id: %d \n", tid);
