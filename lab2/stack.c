@@ -133,3 +133,34 @@ stack_pop(stack_t *s)
   return popped;
 }
 
+stack_element_t*
+aba_stack_pop(stack_t *s)
+{
+  stack_element_t* popped = NULL;
+#if NON_BLOCKING == 1
+  // Implement a harware CAS-based stack
+  stack_element_t* old;
+  size_t result;
+  do
+    {
+      // get current head
+      old = s->head;
+      // set popped element to point towards current head
+      popped = s->head;
+      // make sure we are preemted
+      pthread_mutex_unlock(&aba_mutex1);
+      pthread_mutex_lock(&aba_mutex2);
+      // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes.
+      result = cas((size_t *)& s->head, (size_t) old, (size_t) popped->next);
+      pthread_mutex_unlock(&aba_mutex2);
+    } while (result != (size_t) old);
+#else
+  /*** Optional ***/
+  // Implement a software CAS-based stack
+  // pretty much the same as above but with atomic around what is suppose to happen in CAS
+  // ATOMIC();
+
+  // END_ATOMIC();
+#endif
+  return popped;
+}

@@ -50,6 +50,8 @@ typedef int data_t;
 
 stack_t *stack;
 data_t data;
+pthread_barrier_t barr;
+
 
 #if MEASURE != 0
 struct stack_measure_arg
@@ -115,9 +117,6 @@ test_setup()
   stack = malloc(sizeof(stack_t));
   stack->head = NULL; // empty so should not point anywhere
   // Reset explicitely all members to a well-known initial value
-  /*
-    Note: I assumes that glock does not need to be initialized, may not be the case
-  */
   // initialize the stack with predefined data
   int i;
   stack_element_t* tmp;
@@ -241,53 +240,106 @@ test_pop_safe()
   return result;
 }
 
-// 3 Threads should be enough to raise and detect the A0BA problem
-#define ABA_NB_THREADS 3
+// 2 Threads should be enough to raise and detect the A0BA problem
+#define ABA_NB_THREADS 2
+
+struct thread_test_aba_args_t {
+  unsigned int id;
+};
+typedef struct thread_test_aba_args thread_test_aba_args_t;
+
+void
+thread_test_aba(void* arg)
+{
+  struct thread_test_aba_args_t* args = (struct thread_test_aba_args_t*) arg;
+  // aquire a lock each (could have used semaphores, would have been cleaner)
+  if (args->id == 0)
+    {
+      pthread_mutex_lock(&aba_mutex1);
+    }
+  else
+    {
+      pthread_mutex_lock(&aba_mutex2);
+    }
+  // wait for all threads
+  int rc = pthread_barrier_wait(&barr);
+	if(rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD)
+    {
+      printf("Could not wait on barrier\n");
+      exit(-1);
+    }
+  //   the stack has top -> 1 -> 2 -> 3
+  //    Thread 1 starts pop(), gets preemted before cas(), has ret = 1 and next = 2
+  //    Thread 2 runs pop() without getting preemted, the stack is now top -> 2 -> 3
+  //    Thread 2 runs pop() again without getting preemted, the stack is now top -> 3
+  //    Thread 2 pushes 1 back to the stack without getting preemted, the stack is now top -> 1 -> 3
+  //    Thread 1 is allowed to run now and compares  1 == 1, which will pass as correct.
+  if (args->id == 0)
+    {
+      // thread 1
+      stack_element_t* tmp;
+      tmp = aba_stack_pop(stack);
+    }
+  else
+    {
+      // thread 2
+      pthread_mutex_lock(&aba_mutex1);
+      stack_element_t *first,*second;
+      first = stack_pop(stack);
+      second = stack_pop(stack);
+      stack_push(stack,first);
+      pthread_mutex_unlock(&aba_mutex1);
+      // allow thread 1 to run by releasing lock2
+      pthread_mutex_unlock(&aba_mutex2);
+    }
+}
 
 int
 test_aba()
 {
 #if NON_BLOCKING == 1 || NON_BLOCKING == 2
-  int success, aba_detected = 0;
+  int success;
   // Write here a test for the ABA problem
-  success = aba_detected;
   /*
-    A test case with 3 threads sharing a resource which is modified back and forth.
+    A test case with 2 threads sharing a resource which is modified back and forth.
     Will trigger the ABA problem
    */
+  // Fill the stack with 1,2,3 sequentially
   int i;
-  // get the thread id
-  unsigned int value = 4, iterations = 20;
-  // add some constant dependent on tid
-  for (i = 0; i < iterations; ++i)
+  for (i = 1; i < 4; ++i)
     {
       stack_element_t* new_ele = malloc(sizeof(stack_element_t));
       new_ele->value = i;
       stack_push(stack, new_ele);
     }
-  stack_element_t* tmp;
-  for (i = 0; i < iterations/2; ++i)
-    {
-      tmp = stack_pop(stack);
-      free(tmp);
-    }
+  // create the threads
+  pthread_t thread[ABA_NB_THREADS];
+  pthread_attr_t attr;
+  struct thread_test_aba_args_t args[ABA_NB_THREADS];
+  pthread_mutexattr_t mutex_attr;
 
-  for (i = 0; i < iterations + iterations/2; ++i)
+  test_setup();
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE); 
+  pthread_mutexattr_init(&mutex_attr);
+  // initialize the aba mutexes and barrier defined in stack.h
+  pthread_mutex_init(&aba_mutex1, &mutex_attr);
+  pthread_mutex_init(&aba_mutex2, &mutex_attr);
+  pthread_barrier_init(&barr, NULL, 2);
+  for (i = 0; i < ABA_NB_THREADS; i++)
     {
-      stack_element_t* new_ele = malloc(sizeof(stack_element_t));
-      new_ele->value = value;
-      stack_push(stack, new_ele);
+      args[i].id = i;
+      pthread_create(&thread[i], &attr, &thread_test_aba, (void*) &args[i]);
     }
-  unsigned int counter = 0;
-  stack_element_t* current_pos = stack->head;
-  while (counter < iterations/2 - 1 && current_pos != NULL) {
-    counter++;
-    current_pos = current_pos->next;
-  }
-
-  if (current_pos->value == value)
+  // join all threads
+  for (i = 0; i < ABA_NB_THREADS; i++)
     {
-      success = 1;
+      pthread_join(thread[i], NULL);
+    }
+  if (stack->head != NULL && stack->head->value == 3)
+    {
+      // implementation is affected by aba
+      success = 0;
     }
 
   return success;

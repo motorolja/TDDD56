@@ -27,7 +27,12 @@
 #ifndef STACK_H
 #define STACK_H
 
+// locks for emulating the aba problem
+pthread_mutex_t aba_mutex1;
+pthread_mutex_t aba_mutex2;
 
+// barrier for aba problem
+pthread_barrier_t barr;
 // A node, with a value and pointer to next node
 typedef struct stack_element
 {
@@ -50,6 +55,10 @@ stack_push(stack_t *s, stack_element_t * e);
 // Pops an element in a thread-safe manner
 stack_element_t* /* Return the type you prefer */
 stack_pop(stack_t *s);
+
+// Pops an element in a thread-safe manner
+stack_element_t* /* Return the type you prefer */
+aba_stack_pop(stack_t *s);
 
 
 
