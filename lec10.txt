@@ -1,0 +1,16 @@
+CUDA
+__global__
+  entry point
+
+__device__
+  internal functions for the GPU
+
+compiler: nvcc
+          - .cu files
+          - may compile only CUDA specific parts and let gcc/g++ compile .c/.cpp
+          - nvcc cuda_code.cu -o cuda_kernel.o -c
+          - g++ main.c
+
+To run, make sure the proper library is in the environment variables.
+
+Every thread does its own calculation for indexing memory

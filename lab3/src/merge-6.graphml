@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+         http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+<!-- Created by igraph -->
+  <key id="g_name" for="graph" attr.name="name" attr.type="string"/>
+  <key id="g_deadline" for="graph" attr.name="deadline" attr.type="string"/>
+  <key id="v_name" for="node" attr.name="name" attr.type="string"/>
+  <key id="v_module" for="node" attr.name="module" attr.type="string"/>
+  <key id="v_workload" for="node" attr.name="workload" attr.type="double"/>
+  <key id="v_streaming" for="node" attr.name="streaming" attr.type="double"/>
+  <key id="v_efficiency" for="node" attr.name="efficiency" attr.type="string"/>
+  <key id="v_max_width" for="node" attr.name="max_width" attr.type="string"/>
+  <key id="e_producer_name" for="edge" attr.name="producer_name" attr.type="string"/>
+  <key id="e_consumer_name" for="edge" attr.name="consumer_name" attr.type="string"/>
+  <key id="e_type" for="edge" attr.name="type" attr.type="string"/>
+  <key id="e_rate" for="edge" attr.name="rate" attr.type="double"/>
+  <graph id="G" edgedefault="directed">
+    <data key="g_name">pipelined_merge</data>
+    <data key="g_deadline">0</data>
+    <node id="n0">
+      <data key="v_name">leaf_1</data>
+      <data key="v_module">presort</data>
+      <data key="v_workload">1</data>
+      <data key="v_streaming">0</data>
+      <data key="v_efficiency">1 1e-06 1e-06 1e-06 1e-06 1e-06 </data>
+      <data key="v_max_width">1</data>
+    </node>
+    <node id="n1">
+      <data key="v_name">leaf_2</data>
+      <data key="v_module">presort</data>
+      <data key="v_workload">1</data>
+      <data key="v_streaming">0</data>
+      <data key="v_efficiency">1 1e-06 1e-06 1e-06 1e-06 1e-06 </data>
+      <data key="v_max_width">1</data>
+    </node>
+    <node id="n2">
+      <data key="v_name">root</data>
+      <data key="v_module">merge</data>
+      <data key="v_workload">1</data>
+      <data key="v_streaming">1</data>
+      <data key="v_efficiency">1 1e-06 1e-06 1e-06 1e-06 1e-06 </data>
+      <data key="v_max_width">1</data>
+    </node>
+    <edge source="n0" target="n2">
+      <data key="e_producer_name">output</data>
+      <data key="e_consumer_name">left</data>
+      <data key="e_type">int</data>
+      <data key="e_rate">1</data>
+    </edge>
+    <edge source="n1" target="n2">
+      <data key="e_producer_name">output</data>
+      <data key="e_consumer_name">right</data>
+      <data key="e_type">int</data>
+      <data key="e_rate">1</data>
+    </edge>
+  </graph>
+</graphml>
