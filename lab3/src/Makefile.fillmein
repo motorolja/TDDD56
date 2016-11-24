@@ -14,9 +14,9 @@ SORT_CC_FILES =
 ## Additional compiler flag to pass to C-compiled sources
 CFLAGS = 
 ## Additional compiler flags to pass to C++-compiled sources
-CXXFLAGS = 
+CXXFLAGS = -O2 -Wall -pthread
 ## Additional linker flags
-CXX_LDFLAGS =  
+CXX_LDFLAGS = 
 
 ## Number of threads to compile
 NB_THREADS = 1

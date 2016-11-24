@@ -5,6 +5,8 @@
 #include <cmath>
 #include "sort.h"
 
+#include <pthread.h>
+
 // These can be handy to debug your code through printf. Compile with CONFIG=DEBUG flags and spread debug(var)
 // through your code to display values that may understand better why your code may not work. There are variants
 // for strings (debug()), memory addresses (debug_addr()), integers (debug_int()) and buffer size (debug_size_t()).
@@ -111,21 +113,34 @@ static void sequential_quicksort(int *array, size_t size, size_t offset = 0)
 	if(size > 1)
 	{
     pivot = quicksort_pick_pivot(array, size, offset);
-
-    // left = (int*)malloc(size * sizeof(int));
-		// right = (int*)malloc(size * sizeof(int));
-
-		// Split
-		for(i = offset; i < size + offset; i++)
+    int counter = 0;
+		for(i = offset, counter = 0; i < size + offset; i++, counter++)
 		{
 			if(array[i] < array[pivot])
 			{
+        if (left_size < counter && i > pivot)
+          {
+            std::swap(array[i], array[pivot]);
+            std::swap(array[i], array[pivot+pivot_count]);
+            pivot += 1;
+          }
 				left_size++;
 			}
 			else if(array[i] > array[pivot])
 			{
-        std::swap(array[i],array[pivot]);
-        pivot = i;
+        if (i < pivot)
+          {
+            std::swap(array[i], array[pivot+pivot_count]);
+            if ( i != pivot -1)
+              {
+                std::swap(array[i],array[pivot-1]);
+                pivot -= 1;
+              }
+            else
+              {
+                pivot = i;
+              }
+          }
 				right_size++;
 			}
 			else
@@ -137,18 +152,6 @@ static void sequential_quicksort(int *array, size_t size, size_t offset = 0)
 		// Recurse
 		sequential_quicksort(array, left_size, offset);
 		sequential_quicksort(array, right_size, right_size + pivot_count + offset);
-
-		//// Merge
-		//memcpy(array, left, left_size * sizeof(int));
-		//for(i = left_size; i < left_size + pivot_count; i++)
-		//{
-		//	array[i] = pivot;
-		//}
-		//memcpy(array + left_size + pivot_count, right, right_size * sizeof(int));
-
-		//// Free
-		//free(left);
-		//free(right);
 	}
 	else
 	{
@@ -180,18 +183,34 @@ static void parallel_quicksort(void* arg)
 	if(args->size > 1)
     {
       pivot = quicksort_pick_pivot(args->array, args->size, args->offset);
-
-      // Split
-      for(i = args->offset; i < args->size + args->offset; i++)
+      int counter;
+      for(i = args->offset, counter = 0; i < args->size + args->offset; i++, counter++)
         {
           if(args->array[i] < args->array[pivot])
             {
+              if (left_size < counter && i > pivot)
+                {
+                  std::swap(args->array[i], args->array[pivot]);
+                  std::swap(args->array[i], args->array[pivot+pivot_count]);
+                  pivot += 1;
+                }
               left_size++;
             }
           else if(args->array[i] > args->array[pivot])
             {
-              std::swap(args->array[i],args->array[pivot]);
-              pivot = i;
+              if (i < pivot)
+                {
+                  std::swap(args->array[i], args->array[pivot+pivot_count]);
+                  if ( i != pivot -1)
+                    {
+                      std::swap(args->array[i], args->array[pivot-1]);
+                      pivot -= 1;
+                    }
+                  else
+                    {
+                      pivot = i;
+                    }
+                }
               right_size++;
             }
           else
@@ -203,14 +222,15 @@ static void parallel_quicksort(void* arg)
       // Recurse
 
       // This is to ensure unique thread ids, does not need to be created in the order
-      // which the ids exists! e.g thread id 8 could be created before 5 and so on.
+      // e.g thread id 8 could be created before 5 and so on.
       size_t next_tid = pow(2,(depth-1)) + args->id;
       depth++;
       // means we will get new threads on depth 1 and 2, in other words:
-      // 2 threads depth 1
-      // 4 threads depth 2
-      // 8 threads at depth 3 --- this is more than we can run at the same time!
-      if (NB_THREADS > 1 && next_tid <= NB_THREADS && depth <= 3)
+      // 2 threads max depth 1
+      // 4 threads max depth 2
+      // 8 threads max at depth 3 --- this is more than we can run at the same time!
+      // I will only create exactly NB_THREADS as maximum if depth is deep enough
+      if (NB_THREADS > 1 && next_tid <= NB_THREADS)
         {
           quicksort_args_t *left_args = new quicksort_args_t();
           left_args->array = args->array;

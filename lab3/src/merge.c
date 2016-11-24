@@ -121,9 +121,37 @@ drake_run(task_t *task)
 
 
 	// Merge as much as you can here
-
-
 	// Don't forget, the task may receive more data from its left or right child, unless the left or right child terminated.
+
+  while(true)
+    {
+      if (parent_pushed > parent_size-1)
+        {
+          break;
+        }
+
+      if (right_size <= right_consumed && left_size <= left_consumed)
+        {
+          break;
+        }
+      // check left child
+      if (left[left_consumed] < right[consumed])
+        {
+          // push new parent and increment counters
+          parent[parent_pushed] = left[left_consumed];
+          left_consumed++;
+          parent_pushed++;
+        }
+      // check right child
+      else
+        {
+          // push new parent and increment counters
+          parent[parent_pushed] = right[right_consumed];
+          right_consumed++;
+          parent_pushed++;
+        }
+
+    }
 	// You will need to know the state of a task with
 	//
 	// drake_task_killed(task)
@@ -134,11 +162,47 @@ drake_run(task_t *task)
 	// This returns 0 is more data can be accessible in later iterations, 1 if no more input can be expected from the task or if the task
 	// will not receive any more input from any of its input channels.
 
-	
+
+  // check for crashes - do I really need this? does not the other while true catch this?
+  /*
+  if (drake_task_killed(left_link->pred))
+    {
+      while(right_consumed < right_size)
+        {
+          if (parent_pushed > parent_size-1)
+            {
+              break;
+            }
+          // push new parent and increment counters
+          parent[parent_pushed] = right[right_consumed];
+          right_consumed++;
+          parent_pushed++;
+        }
+    }
+
+  if (drake_task_killed(right_link->pred))
+    {
+      while(left_consumed < left_size)
+        {
+          if (parent_pushed > parent_size-1)
+            {
+              break;
+            }
+          // push new parent and increment counters
+          parent[parent_pushed] = left[left_consumed];
+          left_consumed++;
+          parent_pushed++;
+        }
+    }
+  */
+
 	// Write the number of element you consumed from left child and right child into left_consumed and right_consumed, respectively
 	// and the total number of elements you pushed toward parent in parent_pushed
 
-
+  debug_int(parent_size);
+  debug_int(parent_pushed);
+  debug_int(left_consumed);
+  debug_int(right_consumed);
 	// Now discarding input consumed and pushed output produced through channels and using the number of elements consumed and produced
 	// that you set above.
 	pelib_cfifo_discard(int)(left_link->buffer, left_consumed);
@@ -152,7 +216,11 @@ drake_run(task_t *task)
 	// check drake_task_is_depleted(task_tp t)
 	//
 	// That returns 1 if all predecessors of task t are killed and all input buffers are empty, or if task t is killed and 0 otherwise.
-	return 0;
+  if (drake_task_depeleted(task))
+    {
+      return 1;
+    }
+  return 0;
 }
 
 int
