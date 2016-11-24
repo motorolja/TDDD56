@@ -118,7 +118,7 @@ stack_pop(stack_t *s)
       // get current head
       old = s->head;
       // set popped element to point towards current head
-      popped = s->head;
+      popped = old;
       // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes.
       result = cas((size_t *)& s->head, (size_t) old, (size_t) popped->next);
     } while (result != (size_t) old);
@@ -146,12 +146,14 @@ aba_stack_pop(stack_t *s)
       // get current head
       old = s->head;
       // set popped element to point towards current head
-      popped = s->head;
+      popped = old->next;
+      printf("Thread1: going to pop %p\n", popped);
+      printf("Thread1: next is %p\n", popped->next);
       // make sure we are preemted
       pthread_mutex_unlock(&aba_mutex1);
       pthread_mutex_lock(&aba_mutex2);
       // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes.
-      result = cas((size_t *)& s->head, (size_t) old, (size_t) popped->next);
+      result = cas((size_t *)& s->head, (size_t) old, (size_t) popped);
       pthread_mutex_unlock(&aba_mutex2);
     } while (result != (size_t) old);
 #else
@@ -164,3 +166,4 @@ aba_stack_pop(stack_t *s)
 #endif
   return popped;
 }
+

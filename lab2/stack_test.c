@@ -125,6 +125,9 @@ test_setup()
       tmp = malloc(sizeof(stack_element_t));
       tmp->value = i;
       stack_push(stack,tmp);
+#if MEASURE == 2
+      stack_pop(stack);
+#endif
     }
 }
 
@@ -247,8 +250,13 @@ struct thread_test_aba_args_t {
   unsigned int id;
 };
 typedef struct thread_test_aba_args thread_test_aba_args_t;
+stack_element_t *first,*second;
+stack_element_t* tmp;
 
-void
+#define debug_addr(addr) printf("[%s:%s:%d:%d] %s = %p\n", __FILE__ ,__FUNCTION__, __LINE__, args->id, #addr, addr)
+#define check(id) printf(" ==== Thread %d ====\n", id + 1); debug_addr(stack->head); debug_addr(tmp); debug_addr(first); debug_addr(second);
+
+void *
 thread_test_aba(void* arg)
 {
   struct thread_test_aba_args_t* args = (struct thread_test_aba_args_t*) arg;
@@ -274,31 +282,76 @@ thread_test_aba(void* arg)
   //    Thread 2 runs pop() again without getting preemted, the stack is now top -> 3
   //    Thread 2 pushes 1 back to the stack without getting preemted, the stack is now top -> 1 -> 3
   //    Thread 1 is allowed to run now and compares  1 == 1, which will pass as correct.
-  if (args->id == 0)
+  {
+    stack_element_t *t = stack->head;
+    while (t!=NULL)
+      {
+        //debug_addr(t);
+        t = t->next;
+      }
+  }
+ if (args->id == 0)
     {
       // thread 1
-      stack_element_t* tmp;
+      printf("Thread1: pop is preemted\n");
       tmp = aba_stack_pop(stack);
+      check(args->id);
+      printf("Thread1: pop after preemted, %d\n", tmp->value);
     }
   else
     {
       // thread 2
       pthread_mutex_lock(&aba_mutex1);
-      stack_element_t *first,*second;
       first = stack_pop(stack);
+      printf("Thread2: pop, %d \n", first->value);
+      check(args->id);
       second = stack_pop(stack);
+      printf("Thread2: pop, %d \n", second->value);
+      check(args->id);
       stack_push(stack,first);
+      printf("Thread2: push back first value %d \n", first->value);
+      first = NULL; // first doesn't hold any element anymore
+      check(args->id);
       pthread_mutex_unlock(&aba_mutex1);
       // allow thread 1 to run by releasing lock2
       pthread_mutex_unlock(&aba_mutex2);
     }
+  rc = pthread_barrier_wait(&barr);
+  check(args->id);
+	if(rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD)
+    {
+      printf("Could not wait on barrier\n");
+      exit(-1);
+    }
+  if (args->id == 0)
+    {
+      stack_element_t *t = stack->head;
+      while (1)
+        {
+          if(t == NULL)
+            {
+              break;
+            }
+          if (t == tmp || t == first || t == second)
+            {
+              printf("Affected by aba!\n");
+            }
+          t = t->next;
+        }
+    }
+  rc = pthread_barrier_wait(&barr);
+	if(rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD)
+    {
+      printf("Could not wait on barrier\n");
+      exit(-1);
+    }
+  return NULL;
 }
 
 int
 test_aba()
 {
 #if NON_BLOCKING == 1 || NON_BLOCKING == 2
-  int success;
   // Write here a test for the ABA problem
   /*
     A test case with 2 threads sharing a resource which is modified back and forth.
@@ -336,13 +389,15 @@ test_aba()
     {
       pthread_join(thread[i], NULL);
     }
-  if (stack->head != NULL && stack->head->value == 3)
+  //printf("stack: %d\n", stack->head->value);
+  if (stack->head != NULL)
     {
+      printf("Implementation is affected by aba\n");
       // implementation is affected by aba
-      success = 0;
+      return 0;
     }
 
-  return success;
+  return 1;
 #else
   // No ABA is possible with lock-based synchronization. Let the test succeed only
   return 1;
