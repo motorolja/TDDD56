@@ -118,6 +118,7 @@ test_setup()
   stack->head = NULL; // empty so should not point anywhere
   // Reset explicitely all members to a well-known initial value
   // initialize the stack with predefined data
+#if MEASURE == 1
   int i;
   stack_element_t* tmp;
   for (i = 0; i < MAX_PUSH_POP; ++i)
@@ -125,10 +126,8 @@ test_setup()
       tmp = malloc(sizeof(stack_element_t));
       tmp->value = i;
       stack_push(stack,tmp);
-#if MEASURE == 2
-      stack_pop(stack);
-#endif
     }
+#endif
 }
 
 void
