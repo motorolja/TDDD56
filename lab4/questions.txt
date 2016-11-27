@@ -2,5 +2,6 @@ How many cores will simple.cu use, max, as written? How many SMs?
 16, 1 block == 1 SM
 
 Is the calculated square root the same on CPU/GPU, should we assume this is always the case?
-The same, depends on what functional units are available, some GPUs ultilize double precision functional units for better accuracy.
+The same and no this is not always the case since GPUs utilize fused multiply-add operator and the CPU does not.
+The CPU might also have a different precision than the GPU, even if results are rounded to the same precision the result may vary.
 
