@@ -21,6 +21,7 @@
 
 // Image data
 unsigned char	*pixels = NULL;
+unsigned char	*gpu_bitmap = NULL;
 int	 gImageWidth, gImageHeight;
 
 // Init image data
@@ -33,6 +34,8 @@ void initBitmap(int width, int height)
 }
 
 #define DIM 512
+#define PIXELS DIM*DIM
+#define PIXEL_DATA PIXELS*4
 
 // Select precision here! float or double!
 #define MYFLOAT float
@@ -48,18 +51,22 @@ struct cuComplex
   MYFLOAT   r;
   MYFLOAT   i;
 
+  __device__
   cuComplex( MYFLOAT a, MYFLOAT b ) : r(a), i(b)  {}
 
+  __device__
   float magnitude2( void )
   {
     return r * r + i * i;
   }
 
+  __device__
   cuComplex operator*(const cuComplex& a)
   {
     return cuComplex(r*a.r - i*a.i, i*a.r + r*a.i);
   }
 
+  __device__
   cuComplex operator+(const cuComplex& a)
   {
     return cuComplex(r+a.r, i+a.i);
@@ -71,8 +78,11 @@ struct cuComplex
 __device__
 int mandelbrot( int x, int y)
 {
-  MYFLOAT jx = scale * (MYFLOAT)(gImageWidth/2 - x + offsetx/scale)/(gImageWidth/2);
-  MYFLOAT jy = scale * (MYFLOAT)(gImageHeight/2 - y + offsety/scale)/(gImageWidth/2);
+  float gscale = 1.5;
+  const int maxiter = 200;
+
+  MYFLOAT jx = gscale * (MYFLOAT)(DIM/2 - x)/(DIM/2);
+  MYFLOAT jy = gscale * (MYFLOAT)(DIM/2 - y)/(DIM/2);
 
   cuComplex c(jx, jy);
   cuComplex a(jx, jy);
@@ -92,41 +102,33 @@ int mandelbrot( int x, int y)
 __global__
 void computeFractal( unsigned char *ptr)
 {
+  int const maxiter = 200;
   // compute indexes for gpu threads
   int row = blockIdx.y * blockDim.y + threadIdx.y;
-  int col = blockIdx.y * blockDim.y + threadIdx.y;
-  int id = blockIdx.y * blockDim.y + threadIdx.y;
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  int indexes = col * DIM + row;
 
-  // if we are outside our dimensions
-  if (row >= DIM || col >= DIM)
+  // just a sanity check, should never occur
+  if (row >= DIM || col >= DIM || indexes >= PIXELS)
     {
       return;
     }
+  // calculate the value at that position
+  int fractalValue = mandelbrot( col, row);
 
+  // Colorize it
+  int red = 255 * fractalValue/maxiter;
+  if (red > 255) red = 255 - red;
+  int green = 255 * fractalValue*4/maxiter;
+  if (green > 255) green = 255 - green;
+  int blue = 255 * fractalValue*20/maxiter;
+  if (blue > 255) blue = 255 - blue;
 
-  // map from x, y to pixel position
-  for (int x = 0; x < row; x++)
-    for (int y = 0; y < col; y++)
-	    {
-		    int offset = x + y * gImageWidth;
+  ptr[indexes*4 + 0] = red;
+  ptr[indexes*4 + 1] = green;
+  ptr[indexes*4 + 2] = blue;
 
-		    // now calculate the value at that position
-		    int fractalValue = mandelbrot( x, y);
-
-		    // Colorize it
-		    int red = 255 * fractalValue/maxiter;
-		    if (red > 255) red = 255 - red;
-		    int green = 255 * fractalValue*4/maxiter;
-		    if (green > 255) green = 255 - green;
-		    int blue = 255 * fractalValue*20/maxiter;
-		    if (blue > 255) blue = 255 - blue;
-
-		    ptr[offset*4 + 0] = red;
-		    ptr[offset*4 + 1] = green;
-		    ptr[offset*4 + 2] = blue;
-
-		    ptr[offset*4 + 3] = 255;
-    	}
+  ptr[indexes*4 + 3] = 255;
 }
 
 char print_help = 0;
@@ -180,8 +182,34 @@ void PrintHelp()
 void Draw()
 {
   // Allocation of memory for CUDA should be done once and not every iteration
-  // TODO: Call with CUDA
-	computeFractal(pixels);
+  dim3 dimBlock(DIM/128, DIM/128); // might need tuning
+  dim3 dimGrid(128, 128); // might need tuning
+
+  // CUDA events
+  cudaEvent_t e1, e2;
+  cudaEventCreate(&e1);
+  cudaEventCreate(&e2);
+  cudaEventRecord(e1,0);
+  cudaEventSynchronize(e1);
+
+  // Call CUDA with the kernel
+	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap);
+  // wait for the whole image to be calculated
+  cudaThreadSynchronize();
+
+  // Synchronize and get the time between e1 - e2
+  cudaEventRecord(e2,0);
+  cudaEventSynchronize(e2);
+  float time_elapsed;
+  cudaEventElapsedTime(&time_elapsed, e1, e2);
+  printf("Time elapsed(CUDA): %f ms\n", time_elapsed);
+
+  // clean up
+  cudaEventDestroy(e1);
+  cudaEventDestroy(e2);
+
+  // copy back the result from the GPU calculations
+  cudaMemcpy(pixels, gpu_bitmap, PIXEL_DATA, cudaMemcpyDeviceToHost);
 
   // Dump the whole picture onto the screen. (Old-style OpenGL but without lots of geometry that doesn't matter so much.)
 	glClearColor( 0.0, 0.0, 0.0, 1.0 );
@@ -279,5 +307,10 @@ int main( int argc, char** argv)
 
 	initBitmap(DIM, DIM);
 
+  // Allocate GPU memory, picture has DIM x DIM size + 4 color values
+  cudaMalloc(&gpu_bitmap,PIXEL_DATA);
+
 	glutMainLoop();
+  // Free memory
+  cudaFree(gpu_bitmap);
 }
