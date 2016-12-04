@@ -100,7 +100,7 @@ int mandelbrot( int x, int y)
 
 // Entry point for CUDA calls
 __global__
-void computeFractal( unsigned char *ptr)
+void computeFractal( unsigned char *ptr, float mouse_x, float mouse_y)
 {
   int const maxiter = 200;
   // compute indexes for gpu threads
@@ -109,10 +109,10 @@ void computeFractal( unsigned char *ptr)
   int indexes = col * DIM + row;
 
   // just a sanity check, should never occur
-  if (row >= DIM || col >= DIM || indexes >= PIXELS)
-    {
-      return;
-    }
+  //  if (row >= DIM || col >= DIM || indexes >= PIXELS)
+  //    {
+  //      return;
+  //    }
   // calculate the value at that position
   int fractalValue = mandelbrot( col, row);
 
@@ -132,7 +132,6 @@ void computeFractal( unsigned char *ptr)
 }
 
 char print_help = 0;
-
 // Yuck, GLUT text is old junk that should be avoided... but it will have to do
 static void print_str(void *font, const char *string)
 {
@@ -178,12 +177,13 @@ void PrintHelp()
     }
 }
 
+
 // Compute fractal and display image
 void Draw()
 {
   // Allocation of memory for CUDA should be done once and not every iteration
-  dim3 dimBlock(DIM/128, DIM/128); // might need tuning
-  dim3 dimGrid(128, 128); // might need tuning
+  dim3 dimBlock(DIM, DIM); // might need tuning
+  dim3 dimGrid(64, 64); // might need tuning
 
   // CUDA events
   cudaEvent_t e1, e2;
@@ -192,8 +192,8 @@ void Draw()
   cudaEventRecord(e1,0);
   cudaEventSynchronize(e1);
 
-  // Call CUDA with the kernel
-	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap);
+  // Call CUDA with the kernel with the picture + mouse offset
+	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap,0.0,0.0);
   // wait for the whole image to be calculated
   cudaThreadSynchronize();
 
@@ -209,7 +209,7 @@ void Draw()
   cudaEventDestroy(e2);
 
   // copy back the result from the GPU calculations
-  cudaMemcpy(pixels, gpu_bitmap, PIXEL_DATA, cudaMemcpyDeviceToHost);
+  cudaMemcpy(pixels, gpu_bitmap, DIM*DIM*4, cudaMemcpyDeviceToHost);
 
   // Dump the whole picture onto the screen. (Old-style OpenGL but without lots of geometry that doesn't matter so much.)
 	glClearColor( 0.0, 0.0, 0.0, 1.0 );

@@ -1,4 +1,4 @@
 #!/bin/bash
-nvcc mandel.cu -o mandel-gpu -lglut -lGL
+nvcc -lglut -lGL mandel.cu -o mandel-gpu
 
 exit

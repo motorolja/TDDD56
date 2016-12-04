@@ -1,7 +1,36 @@
-How many cores will simple.cu use, max, as written? How many SMs?
-16, 1 block == 1 SM
+QUESTION: How many cores will simple.cu use, max, as written? How many SMs?
 
-Is the calculated square root the same on CPU/GPU, should we assume this is always the case?
+16, 1 block => 1 SM
+
+QUESTION: Is the calculated square root the same on CPU/GPU, should we assume this is always the case?
+
 The same and no this is not always the case since GPUs utilize fused multiply-add operator and the CPU does not.
 The CPU might also have a different precision than the GPU, even if results are rounded to the same precision the result may vary.
 
+QUESTION: How do you calculate the index in the array, using 2-dimensional blocks?
+
+int idx = blockIdx.y * blockDim.y + threadIdx.y
+
+QUESTION: What happens if you use too many threads per block?
+
+The results become unpredictable.
+
+QUESTION: At what data size is the GPU faster than the CPU?
+
+Somewhere between 512 < N < 1024
+
+Where datasize = N*N
+
+QUESTION: What block size seems like a good choice? Compared to what?
+
+Blocksize equal to the number of threads available per block. Compared to having
+a blocksize which does not enable each thread per block to do work.
+
+QUESTION: Write down your data size, block size and timing data for the best GPU performance you can get.
+
+Blocksize = 1024,1024,64 (x,y,z)
+
+Max number of floats in memory: 523845632
+
+
+Note to self, done on a more competent computer gtx 680, intel i7 extreme X990 (6 cores, 12 threads)
