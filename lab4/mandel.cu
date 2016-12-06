@@ -1,11 +1,6 @@
 // Mandelbrot explorer, based on my old Julia demo plus parts of Nicolas Melot's Lab 1 code.
 // CPU only! Your task: Rewrite for CUDA! Test and evaluate performance.
 
-// Compile with:
-// gcc interactiveMandelbrot.cpp -shared-libgcc -lstdc++-static  -o interactiveMandelbrot -lglut -lGL
-// or
-// g++ interactiveMandelbrot.cpp -o interactiveMandelbrot -lglut -lGL
-
 // Your CUDA version should compile with something like
 // nvcc -lglut -lGL interactiveMandelbrotCUDA.cu -o interactiveMandelbrotCUDA
 
@@ -45,6 +40,16 @@ int maxiter = 20;
 MYFLOAT offsetx = -200, offsety = 0, zoom = 0;
 MYFLOAT scale = 1.5;
 
+// Controll parameters required by the GPU
+struct GPU_Control
+{
+  int max_iterations = 200;
+  int height, width;
+  MYFLOAT offset_x = -200;
+  MYFLOAT offset_y = 200;
+  MYFLOAT gpu_scale = 1.5;
+};
+
 // Complex number class
 struct cuComplex
 {
@@ -76,19 +81,22 @@ struct cuComplex
 
 // Only called in the CUDA kernel
 __device__
-int mandelbrot( int x, int y)
+int mandelbrot( int x, int y, struct GPU_Control* args)
 {
-  float gscale = 1.5;
-  const int maxiter = 200;
-
-  MYFLOAT jx = gscale * (MYFLOAT)(DIM/2 - x)/(DIM/2);
-  MYFLOAT jy = gscale * (MYFLOAT)(DIM/2 - y)/(DIM/2);
+  MYFLOAT jx =
+    args->gpu_scale
+    * (MYFLOAT)(args->width/2 - x + args->offset_x/args->gpu_scale)
+    /(args->width/2);
+  MYFLOAT jy =
+    args->gpu_scale
+    * (MYFLOAT)(args->height/2 - y + args->offset_y/args->gpu_scale)
+    /(args->height/2);
 
   cuComplex c(jx, jy);
   cuComplex a(jx, jy);
 
   int i = 0;
-  for (i=0; i<maxiter; i++)
+  for (i=0; i<args->max_iterations; i++)
     {
       a = a * a + c;
       if (a.magnitude2() > 1000)
@@ -100,21 +108,25 @@ int mandelbrot( int x, int y)
 
 // Entry point for CUDA calls
 __global__
-void computeFractal( unsigned char *ptr, float mouse_x, float mouse_y)
+void computeFractal( unsigned char *ptr, struct GPU_Control* args)
 {
-  int const maxiter = 200;
   // compute indexes for gpu threads
   int row = blockIdx.y * blockDim.y + threadIdx.y;
   int col = blockIdx.x * blockDim.x + threadIdx.x;
-  int indexes = col * DIM + row;
+  int indexes = col * arg->width + row;
 
   // just a sanity check, should never occur
-  //  if (row >= DIM || col >= DIM || indexes >= PIXELS)
-  //    {
-  //      return;
-  //    }
+  if (row >= args->width || col >= args->height || indexes >= PIXELS)
+    {
+      return;
+    }
+
+  int x = indexes % args->width;
+  int y = indexes / args->width;
+  int offset = x + y * args->width;
+
   // calculate the value at that position
-  int fractalValue = mandelbrot( col, row);
+  int fractalValue = mandelbrot( x, y, args);
 
   // Colorize it
   int red = 255 * fractalValue/maxiter;
@@ -124,11 +136,11 @@ void computeFractal( unsigned char *ptr, float mouse_x, float mouse_y)
   int blue = 255 * fractalValue*20/maxiter;
   if (blue > 255) blue = 255 - blue;
 
-  ptr[indexes*4 + 0] = red;
-  ptr[indexes*4 + 1] = green;
-  ptr[indexes*4 + 2] = blue;
+  ptr[offset*4 + 0] = red;
+  ptr[offset*4 + 1] = green;
+  ptr[offset*4 + 2] = blue;
 
-  ptr[indexes*4 + 3] = 255;
+  ptr[offset*4 + 3] = 255;
 }
 
 char print_help = 0;
@@ -181,9 +193,23 @@ void PrintHelp()
 // Compute fractal and display image
 void Draw()
 {
-  // Allocation of memory for CUDA should be done once and not every iteration
+  // TODO: Allocation of memory for CUDA should be done once and not every iteration
   dim3 dimBlock(DIM, DIM); // might need tuning
   dim3 dimGrid(64, 64); // might need tuning
+
+  // Set the args for handling which part of the picture we want to draw
+  struct GPU_Control args;
+  args.width = gImageWidth;
+  args.height = gImageHeight;
+  args.gpu_scale = scale;
+  args.max_iterations = maxiter;
+  args.offset_x = offsetx;
+  args.offset_y = offsety;
+
+  // Copy args to GPU
+  stuct GPU_Control* gpu_args;
+  cudaMalloc((void**)&gpu_args, sizeof(struct GPU_Control));
+  cudaMemcpy(gpu_args, &args, sizeof(struct GPU_Control), cudaMemcpyHostToDevice);
 
   // CUDA events
   cudaEvent_t e1, e2;
@@ -193,7 +219,7 @@ void Draw()
   cudaEventSynchronize(e1);
 
   // Call CUDA with the kernel with the picture + mouse offset
-	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap,0.0,0.0);
+	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap, args);
   // wait for the whole image to be calculated
   cudaThreadSynchronize();
 
