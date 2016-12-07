@@ -14,41 +14,66 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Select precision here! float or double!
+#define MYFLOAT float
+#define DIM 1024
+
 // Image data
 unsigned char	*pixels = NULL;
+
+// Controll parameters required by the GPU
+struct GPU_Control
+{
+  unsigned int byte_pixels;
+  int max_iterations;
+  int height, width;
+  MYFLOAT offset_x;
+  MYFLOAT offset_y;
+  MYFLOAT gpu_scale;
+};
+
+// GPU params
 unsigned char	*gpu_bitmap = NULL;
-int	 gImageWidth, gImageHeight;
+dim3 dimBlock; // might need tuning
+dim3 dimGrid; // might need tuning
+struct GPU_Control g_args;
+cudaEvent_t e1, e2;
+
+// User controlled parameters
+//int maxiter = 200;
+//MYFLOAT offsetx = -200, offsety = 0, zoom = 0;
+//MYFLOAT scale = 1.5;
 
 // Init image data
 void initBitmap(int width, int height)
 {
 	if (pixels) free(pixels);
-	pixels = (unsigned char *)malloc(width * height * 4);
-	gImageWidth = width;
-	gImageHeight = height;
+
+  int tot = width * height * 4;
+	pixels = (unsigned char *)malloc(tot);
+  // create events for timing, avoids recreation
+  cudaEventCreate(&e1);
+  cudaEventCreate(&e2);
+
+  // Allocate GPU memory, picture has DIM x DIM size + 4 color values
+  cudaMalloc((void**)&gpu_bitmap,tot);
+  cudaDeviceSynchronize();
+
+  // Set arguments passed to GPU
+  g_args.width = width;
+  g_args.height = height;
+  g_args.gpu_scale = 1.5;
+  g_args.max_iterations = 20;
+  g_args.offset_x = -200;
+  g_args.offset_y = 0;
+  g_args.byte_pixels = tot;
+
+  // create layout for GPU
+  int b_size = 32, g_size = DIM/b_size;
+  dimBlock = dim3(b_size,b_size);
+  dimGrid = dim3(g_size,g_size);
 }
 
-#define DIM 512
-#define PIXELS DIM*DIM
-#define PIXEL_DATA PIXELS*4
-
-// Select precision here! float or double!
-#define MYFLOAT float
-
-// User controlled parameters
-int maxiter = 20;
-MYFLOAT offsetx = -200, offsety = 0, zoom = 0;
-MYFLOAT scale = 1.5;
-
-// Controll parameters required by the GPU
-struct GPU_Control
-{
-  int max_iterations = 200;
-  int height, width;
-  MYFLOAT offset_x = -200;
-  MYFLOAT offset_y = 200;
-  MYFLOAT gpu_scale = 1.5;
-};
 
 // Complex number class
 struct cuComplex
@@ -81,22 +106,22 @@ struct cuComplex
 
 // Only called in the CUDA kernel
 __device__
-int mandelbrot( int x, int y, struct GPU_Control* args)
+int mandelbrot( int x, int y, struct GPU_Control args)
 {
   MYFLOAT jx =
-    args->gpu_scale
-    * (MYFLOAT)(args->width/2 - x + args->offset_x/args->gpu_scale)
-    /(args->width/2);
+    args.gpu_scale
+    * (MYFLOAT)(args.width/2 - x + args.offset_x/args.gpu_scale)
+    /(args.width/2);
   MYFLOAT jy =
-    args->gpu_scale
-    * (MYFLOAT)(args->height/2 - y + args->offset_y/args->gpu_scale)
-    /(args->height/2);
+    args.gpu_scale
+    * (MYFLOAT)(args.height/2 - y + args.offset_y/args.gpu_scale)
+    /(args.width/2);
 
   cuComplex c(jx, jy);
   cuComplex a(jx, jy);
 
   int i = 0;
-  for (i=0; i<args->max_iterations; i++)
+  for (i=0; i<args.max_iterations; i++)
     {
       a = a * a + c;
       if (a.magnitude2() > 1000)
@@ -108,39 +133,29 @@ int mandelbrot( int x, int y, struct GPU_Control* args)
 
 // Entry point for CUDA calls
 __global__
-void computeFractal( unsigned char *ptr, struct GPU_Control* args)
+void computeFractal( unsigned char *ptr, struct GPU_Control args)
 {
   // compute indexes for gpu threads
-  int row = blockIdx.y * blockDim.y + threadIdx.y;
-  int col = blockIdx.x * blockDim.x + threadIdx.x;
-  int indexes = col * arg->width + row;
-
-  // just a sanity check, should never occur
-  if (row >= args->width || col >= args->height || indexes >= PIXELS)
-    {
-      return;
-    }
-
-  int x = indexes % args->width;
-  int y = indexes / args->width;
-  int offset = x + y * args->width;
+  int col = blockIdx.y * blockDim.y + threadIdx.y;
+  int row = blockIdx.x * blockDim.x + threadIdx.x;
+  int indexes = row + args.width * col;
 
   // calculate the value at that position
-  int fractalValue = mandelbrot( x, y, args);
+  int fractalValue = mandelbrot(row, col, args);
 
   // Colorize it
-  int red = 255 * fractalValue/maxiter;
+  int red = 255 * fractalValue/args.max_iterations;
   if (red > 255) red = 255 - red;
-  int green = 255 * fractalValue*4/maxiter;
+  int green = 255 * fractalValue*4/args.max_iterations;
   if (green > 255) green = 255 - green;
-  int blue = 255 * fractalValue*20/maxiter;
+  int blue = 255 * fractalValue*20/args.max_iterations;
   if (blue > 255) blue = 255 - blue;
 
-  ptr[offset*4 + 0] = red;
-  ptr[offset*4 + 1] = green;
-  ptr[offset*4 + 2] = blue;
+  ptr[indexes*4 + 0] = red;
+  ptr[indexes*4 + 1] = green;
+  ptr[indexes*4 + 2] = blue;
 
-  ptr[offset*4 + 3] = 255;
+  ptr[indexes*4 + 3] = 255;
 }
 
 char print_help = 0;
@@ -193,35 +208,18 @@ void PrintHelp()
 // Compute fractal and display image
 void Draw()
 {
-  // TODO: Allocation of memory for CUDA should be done once and not every iteration
-  dim3 dimBlock(DIM, DIM); // might need tuning
-  dim3 dimGrid(64, 64); // might need tuning
-
-  // Set the args for handling which part of the picture we want to draw
-  struct GPU_Control args;
-  args.width = gImageWidth;
-  args.height = gImageHeight;
-  args.gpu_scale = scale;
-  args.max_iterations = maxiter;
-  args.offset_x = offsetx;
-  args.offset_y = offsety;
-
-  // Copy args to GPU
-  stuct GPU_Control* gpu_args;
-  cudaMalloc((void**)&gpu_args, sizeof(struct GPU_Control));
-  cudaMemcpy(gpu_args, &args, sizeof(struct GPU_Control), cudaMemcpyHostToDevice);
-
   // CUDA events
-  cudaEvent_t e1, e2;
-  cudaEventCreate(&e1);
-  cudaEventCreate(&e2);
   cudaEventRecord(e1,0);
   cudaEventSynchronize(e1);
 
   // Call CUDA with the kernel with the picture + mouse offset
-	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap, args);
-  // wait for the whole image to be calculated
-  cudaThreadSynchronize();
+	computeFractal <<<dimGrid, dimBlock>>> (gpu_bitmap, g_args);
+  // wait for the whole
+  // image to be calculated
+
+  // copy back the result from the GPU calculations
+  cudaDeviceSynchronize();
+  cudaMemcpy(pixels, gpu_bitmap, g_args.byte_pixels, cudaMemcpyDeviceToHost);
 
   // Synchronize and get the time between e1 - e2
   cudaEventRecord(e2,0);
@@ -230,17 +228,10 @@ void Draw()
   cudaEventElapsedTime(&time_elapsed, e1, e2);
   printf("Time elapsed(CUDA): %f ms\n", time_elapsed);
 
-  // clean up
-  cudaEventDestroy(e1);
-  cudaEventDestroy(e2);
-
-  // copy back the result from the GPU calculations
-  cudaMemcpy(pixels, gpu_bitmap, DIM*DIM*4, cudaMemcpyDeviceToHost);
-
   // Dump the whole picture onto the screen. (Old-style OpenGL but without lots of geometry that doesn't matter so much.)
 	glClearColor( 0.0, 0.0, 0.0, 1.0 );
 	glClear( GL_COLOR_BUFFER_BIT );
-	glDrawPixels( gImageWidth, gImageHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels );
+	glDrawPixels( g_args.width, g_args.height, GL_RGBA, GL_UNSIGNED_BYTE, pixels );
 
 	if (print_help)
 		PrintHelp();
@@ -280,9 +271,9 @@ static void mouse_motion(int x, int y)
 	if (mouse_btn == 0)
     // Ordinary mouse button - move
     {
-      offsetx += (x - mouse_x)*scale;
+      g_args.offset_x += (x - mouse_x)*g_args.gpu_scale;
       mouse_x = x;
-      offsety += (mouse_y - y)*scale;
+      g_args.offset_y += (mouse_y - y)*g_args.gpu_scale;
       mouse_y = y;
 
       glutPostRedisplay();
@@ -290,7 +281,7 @@ static void mouse_motion(int x, int y)
 	else
     // Alt mouse button - scale
     {
-      scale *= pow(1.1, y - mouse_y);
+      g_args.gpu_scale *= pow(1.1, y - mouse_y);
       mouse_y = y;
       glutPostRedisplay();
     }
@@ -306,10 +297,10 @@ void KeyboardProc(unsigned char key, int x, int y)
       exit(0);
       break;
     case '+':
-      maxiter += maxiter < 1024 - 32 ? 32 : 0;
+      g_args.max_iterations += g_args.max_iterations < 1024 - 32 ? 32 : 0;
       break;
     case '-':
-      maxiter -= maxiter > 0 + 32 ? 32 : 0;
+      g_args.max_iterations -= g_args.max_iterations > 0 + 32 ? 32 : 0;
       break;
     case 'h':
       print_help = !print_help;
@@ -333,10 +324,10 @@ int main( int argc, char** argv)
 
 	initBitmap(DIM, DIM);
 
-  // Allocate GPU memory, picture has DIM x DIM size + 4 color values
-  cudaMalloc(&gpu_bitmap,PIXEL_DATA);
-
 	glutMainLoop();
   // Free memory
   cudaFree(gpu_bitmap);
+  // clean up
+  cudaEventDestroy(e1);
+  cudaEventDestroy(e2);
 }
