@@ -1,36 +1,161 @@
-QUESTION: How many cores will simple.cu use, max, as written? How many SMs?
+QUESTION 1: How many cores will simple.cu use, max, as written? How many SMs?
 
 16, 1 block => 1 SM
 
-QUESTION: Is the calculated square root the same on CPU/GPU, should we assume this is always the case?
+QUESTION 2: Is the calculated square root the same on CPU/GPU, should we assume this is always the case?
 
 The same and no this is not always the case since GPUs utilize fused multiply-add operator and the CPU does not.
 The CPU might also have a different precision than the GPU, even if results are rounded to the same precision the result may vary.
 
-QUESTION: How do you calculate the index in the array, using 2-dimensional blocks?
+QUESTION 3: How do you calculate the index in the array, using 2-dimensional blocks?
 
-int idx = blockIdx.y * blockDim.y + threadIdx.y
+int idx = threadIdx.x +  threadIdx.y * blockDim.x  +  blockIdx.x * blockDim.x *
+blockDim.y + blockIdx.y * blockDim.x * blockDim.y * gridDim.x;
 
-QUESTION: What happens if you use too many threads per block?
+QUESTION 4: What happens if you use too many threads per block?
 
 The results become unpredictable.
 
-QUESTION: At what data size is the GPU faster than the CPU?
+QUESTION 5: At what data size is the GPU faster than the CPU?
 
-Somewhere between 512 < N < 1024
+Somewhere between 32 < N < 64
 
 Where datasize = N*N
 
-QUESTION: What block size seems like a good choice? Compared to what?
+N     CPU      GPU
+128   0.119ms  0.0114ms
+64    0.029ms  0.0130ms
+32    0.006ms  0.0126ms
 
-Blocksize equal to the number of threads available per block. Compared to having
-a blocksize which does not enable each thread per block to do work.
+QUESTION 6: What block size seems like a good choice? Compared to what?
 
-QUESTION: Write down your data size, block size and timing data for the best GPU performance you can get.
+Block size of 128x128 seems to give the highest performance.
+This means that we get faster performance even though we
+do not fill the maximum limit for block size (1024x1024x64 on GTX 680).
+This means that the utilization is too small per thread or is io bound
+for gaining performance by increasing the number threads.
 
-Blocksize = 1024,1024,64 (x,y,z)
+QUESTION 7: Write down your data size, block size and timing data for the best GPU performance you can get.
 
-Max number of floats in memory: 523845632
+Problem size = 1024x1024
+Block size = 128x128
+Execution time 0.0148 ms
 
+N         Block size  time
+1024      512x512     0.0181
+1024      256x256     0.0156
+1024      128x128     0.0148
+1024      64x64       0.0161
+
+
+
+QUESTION 8: How much performance did you lose by making data accesses non-coalesced?
+
+Took about twice time using the same settings as previously.
+
+
+QUESTION 9: What were the main changes in order to make the Mandelbrot run in CUDA?
+
+Make the computeFractal run in a CUDA kernel (__global__) instead and
+then move the mandelbrot function to run in another (__device__) kernel.
+Threads also needs to compute their indexes to know which pixels to compute.
+Some variables also needed to be copied to the GPU (maxiteratios, offset, etc).
+
+QUESTION 10: How many blocks and threads did you use?
+
+FUU i3 for not auto scaling to window size............thought the solution
+did not work due to i3 forcing fullscreen......
+
+I used Block size 32x32, grid (image_dim/block_size,image_dim/block_size)
+
+QUESTION 11: When you use the Complex class, what modifier did you have to use on the methods?
+
+__device__
+
+QUESTION 12: What performance did you get? How does that compare to the CPU solution?
+
+knase@guts:~/Documents/TDDD56/lab4$ ./mandel-gpu 
+Time elapsed(CUDA): 2.949440 ms
+Time elapsed(CUDA): 6.171392 ms
+Time elapsed(CUDA): 5.085472 ms
+Time elapsed(CUDA): 7.254688 ms
+Time elapsed(CUDA): 7.138880 ms
+Time elapsed(CUDA): 10.318336 ms
+Time elapsed(CUDA): 6.810240 ms
+Time elapsed(CUDA): 7.291136 ms
+Time elapsed(CUDA): 8.590016 ms
+Time elapsed(CUDA): 10.643872 ms
+Time elapsed(CUDA): 10.923616 ms
+Time elapsed(CUDA): 10.723808 ms
+Time elapsed(CUDA): 8.070400 ms
+Time elapsed(CUDA): 7.329632 ms
+
+knase@guts:~/Documents/TDDD56/lab4$ ./mandel-cpu 
+CPU, time taken in microseconds: 176546
+CPU, time taken in microseconds: 175506
+CPU, time taken in microseconds: 1423714
+CPU, time taken in microseconds: 1410150
+CPU, time taken in microseconds: 1348130
+CPU, time taken in microseconds: 1347570
+CPU, time taken in microseconds: 1319492
+CPU, time taken in microseconds: 1308130
+CPU, time taken in microseconds: 1373205
+CPU, time taken in microseconds: 1387353
+CPU, time taken in microseconds: 1163634
+CPU, time taken in microseconds: 1162694
+CPU, time taken in microseconds: 853537
+CPU, time taken in microseconds: 853291
+CPU, time taken in microseconds: 913747
+
+
+QUESTION 13: What performance did you get with float vs double precision?
+
+Float:
+knase@guts:~/Documents/TDDD56/lab4$ ./mandel-gpu 
+Time elapsed(CUDA): 2.949440 ms
+Time elapsed(CUDA): 6.171392 ms
+Time elapsed(CUDA): 5.085472 ms
+Time elapsed(CUDA): 7.254688 ms
+Time elapsed(CUDA): 7.138880 ms
+Time elapsed(CUDA): 10.318336 ms
+Time elapsed(CUDA): 6.810240 ms
+Time elapsed(CUDA): 7.291136 ms
+Time elapsed(CUDA): 8.590016 ms
+Time elapsed(CUDA): 10.643872 ms
+Time elapsed(CUDA): 10.923616 ms
+Time elapsed(CUDA): 10.723808 ms
+Time elapsed(CUDA): 8.070400 ms
+Time elapsed(CUDA): 7.329632 ms
+
+
+Double:
+knase@guts:~/Documents/TDDD56/lab4$ ./mandel-gpu 
+Time elapsed(CUDA): 3.067424 ms
+Time elapsed(CUDA): 16.715839 ms
+Time elapsed(CUDA): 6.335744 ms
+Time elapsed(CUDA): 6.370048 ms
+Time elapsed(CUDA): 7.560032 ms
+Time elapsed(CUDA): 9.887648 ms
+Time elapsed(CUDA): 8.563392 ms
+Time elapsed(CUDA): 11.522432 ms
+Time elapsed(CUDA): 11.222592 ms
+Time elapsed(CUDA): 9.852512 ms
+Time elapsed(CUDA): 10.102624 ms
+Time elapsed(CUDA): 10.811648 ms
+Time elapsed(CUDA): 10.633376 ms
+Time elapsed(CUDA): 6.197568 ms
+Time elapsed(CUDA): 8.263008 ms
+Time elapsed(CUDA): 11.371200 ms
+Time elapsed(CUDA): 10.805120 ms
+Time elapsed(CUDA): 10.734784 ms
+Time elapsed(CUDA): 10.750144 ms
+Time elapsed(CUDA): 11.229568 ms
+
+
+QUESTION 14: In Lab 1, load balancing was an important issue. Is that an issue here? Why/why not?
+
+No since the GPU takes care of scheduling the threads in blocks automatically.
+It may be possible to get better performance by making sure that all threads
+within a block has the same amount of computation.
 
 Note to self, done on a more competent computer gtx 680, intel i7 extreme X990 (6 cores, 12 threads)

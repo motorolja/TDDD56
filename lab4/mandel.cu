@@ -15,7 +15,7 @@
 #include <math.h>
 
 // Select precision here! float or double!
-#define MYFLOAT float
+#define MYFLOAT double
 #define DIM 1024
 
 // Image data
@@ -57,7 +57,6 @@ void initBitmap(int width, int height)
 
   // Allocate GPU memory, picture has DIM x DIM size + 4 color values
   cudaMalloc((void**)&gpu_bitmap,tot);
-  cudaDeviceSynchronize();
 
   // Set arguments passed to GPU
   g_args.width = width;
@@ -69,9 +68,10 @@ void initBitmap(int width, int height)
   g_args.byte_pixels = tot;
 
   // create layout for GPU
-  int b_size = 32, g_size = DIM/b_size;
+  int b_size = 16, g_size = DIM/b_size;
   dimBlock = dim3(b_size,b_size);
   dimGrid = dim3(g_size,g_size);
+  //dimGrid = dim3(g_size + 48,g_size + 12);
 }
 
 
@@ -136,12 +136,16 @@ __global__
 void computeFractal( unsigned char *ptr, struct GPU_Control args)
 {
   // compute indexes for gpu threads
-  int col = blockIdx.y * blockDim.y + threadIdx.y;
-  int row = blockIdx.x * blockDim.x + threadIdx.x;
-  int indexes = row + args.width * col;
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  int indexes = col + args.width * row;
 
+  if (col >=args.width || row >= args.height)
+    {
+      return;
+    }
   // calculate the value at that position
-  int fractalValue = mandelbrot(row, col, args);
+  int fractalValue = mandelbrot(col, row, args);
 
   // Colorize it
   int red = 255 * fractalValue/args.max_iterations;

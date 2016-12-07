@@ -34,7 +34,7 @@ void add_matrix_tid(float *a, float *b, float *c, int N)
 
 int main()
 {
-	const int N = 1024;
+	const int N = 32;
 
   float *a = new float[N*N];
 	float *b = new float[N*N];
@@ -80,15 +80,18 @@ int main()
   cudaEvent_t myEvent,myEventB;
   cudaEventCreate(&myEvent);
   cudaEventCreate(&myEventB);
-  cudaEventRecord(myEvent, 0);
-  cudaEventSynchronize(myEvent);
-
   // copy matrixes to GPU
   cudaMemcpy(a_d, a, N*N*sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b_d, b, N*N*sizeof(float), cudaMemcpyHostToDevice);
 
+  int block_size = 64, grid_size = block_size/N;
+  dim3 dimBlock(block_size, block_size);
+  dim3 dimGrid(grid_size,grid_size);
   // do GPU calculations
-  add_matrix_tid <<< N, N>>> (a_d, b_d, c_d, N);
+  cudaEventRecord(myEvent, 0);
+  cudaEventSynchronize(myEvent);
+
+  add_matrix_tid <<< dimGrid, dimBlock>>> (a_d, b_d, c_d, N);
   cudaThreadSynchronize();
 
   // set end point for timer and get the elapsed time
@@ -96,11 +99,9 @@ int main()
   cudaEventSynchronize(myEventB);
   float theTime;
   cudaEventElapsedTime(&theTime, myEvent, myEventB);
-  printf("time in ms: %f \n",theTime);
 
   // Overwrite a with the result
   cudaMemcpy(c, c_d, N*N*sizeof(float), cudaMemcpyDeviceToHost);
-
   /*
     for (int i = 0; i < N; i++)
     {
@@ -111,7 +112,7 @@ int main()
 		printf("\n##\n");
     }
   */
-
+  printf("time in ms: %f \n",theTime);
   delete(a);
   delete(b);
   delete(c);
