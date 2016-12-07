@@ -72,7 +72,7 @@ stack_push(stack_t *s, stack_element_t *e)
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
   size_t result;
-  stack_element_t* old;
+  stack_element_t* old = malloc(sizeof(stack_element_t));
   do
     {
       // get current head
@@ -101,13 +101,18 @@ stack_push(stack_t *s, stack_element_t *e)
 stack_element_t* /* Return the type you prefer */
 stack_pop(stack_t *s)
 {
-  stack_element_t* popped;
+ stack_element_t* popped;
 #if NON_BLOCKING == 0
   // Implement a lock_based stack
   pthread_mutex_lock(&s->glock);
-  // save the head before poping
-  popped = s->head;
-  s->head = s->head->next;
+  if (s == NULL || s->head ==  NULL)
+       popped = NULL;
+  else
+  {
+    // save the head before poping
+    popped = s->head;
+    s->head = s->head->next;
+  }
   pthread_mutex_unlock(&s->glock);
 #elif NON_BLOCKING == 1
   // Implement a harware CAS-based stack
@@ -115,8 +120,12 @@ stack_pop(stack_t *s)
   size_t result;
   do
     {
+      if (s == NULL) 
+         return NULL;
       // get current head
       old = s->head;
+      if (old == NULL)
+          return NULL;
       // set popped element to point towards current head
       popped = old;
       // do Compare-And-Swap hardware instruction and save the result, ensure that they are the right types/sizes.

@@ -51,12 +51,15 @@ typedef int data_t;
 stack_t *stack;
 data_t data;
 pthread_barrier_t barr;
+stack_element_t pool[MAX_PUSH_POP];
 
 
 #if MEASURE != 0
 struct stack_measure_arg
 {
   int id;
+  // Added preallocated list of nodes
+  stack_element_t* preallocated_list;
 };
 typedef struct stack_measure_arg stack_measure_arg_t;
 
@@ -85,14 +88,12 @@ stack_measure_push(void* arg)
 {
   stack_measure_arg_t *args = (stack_measure_arg_t*) arg;
   int i;
-  stack_element_t new_ele;
-  new_ele.value = (unsigned int)pthread_self();
   clock_gettime(CLOCK_MONOTONIC, &t_start[args->id]);
   for (i = 0; i < MAX_PUSH_POP / NB_THREADS; i++)
     {
       // See how fast your implementation can push MAX_PUSH_POP elements in parallel
       // just call push with the a new element
-      stack_push(stack,&new_ele);
+      stack_push(stack,&args->preallocated_list[i]);
     }
   clock_gettime(CLOCK_MONOTONIC, &t_stop[args->id]);
   return NULL;
@@ -120,12 +121,10 @@ test_setup()
   // initialize the stack with predefined data
 #if MEASURE == 1
   int i;
-  stack_element_t* tmp;
   for (i = 0; i < MAX_PUSH_POP; ++i)
     {
-      tmp = malloc(sizeof(stack_element_t));
-      tmp->value = i;
-      stack_push(stack,tmp);
+      // changed to pool instead of calling malloc for all nodes
+      stack_push(stack,&pool[i]);
     }
 #endif
 }
@@ -512,6 +511,8 @@ setbuf(stdout, NULL);
   for (i = 0; i < NB_THREADS; i++)
     {
       arg[i].id = i;
+      // Added preallocated list of nodes
+      arg[i].preallocated_list = &pool[i*(MAX_PUSH_POP/NB_THREADS)];
 #if MEASURE == 1
       pthread_create(&thread[i], &attr, stack_measure_pop, (void*)&arg[i]);
 #else
