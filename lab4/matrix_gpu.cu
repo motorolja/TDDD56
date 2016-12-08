@@ -34,7 +34,7 @@ void add_matrix_tid(float *a, float *b, float *c, int N)
 
 int main()
 {
-	const int N = 32;
+	const int N = 128;
 
   float *a = new float[N*N];
 	float *b = new float[N*N];
@@ -84,7 +84,7 @@ int main()
   cudaMemcpy(a_d, a, N*N*sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b_d, b, N*N*sizeof(float), cudaMemcpyHostToDevice);
 
-  int block_size = 64, grid_size = block_size/N;
+  int block_size = 128, grid_size = N/block_size;
   dim3 dimBlock(block_size, block_size);
   dim3 dimGrid(grid_size,grid_size);
   // do GPU calculations
@@ -102,7 +102,7 @@ int main()
 
   // Overwrite a with the result
   cudaMemcpy(c, c_d, N*N*sizeof(float), cudaMemcpyDeviceToHost);
-  /*
+  
     for (int i = 0; i < N; i++)
     {
 		for (int j = 0; j < N; j++)
@@ -111,7 +111,7 @@ int main()
 		}
 		printf("\n##\n");
     }
-  */
+ 
   printf("time in ms: %f \n",theTime);
   delete(a);
   delete(b);

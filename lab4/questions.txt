@@ -9,8 +9,12 @@ The CPU might also have a different precision than the GPU, even if results are 
 
 QUESTION 3: How do you calculate the index in the array, using 2-dimensional blocks?
 
-int idx = threadIdx.x +  threadIdx.y * blockDim.x  +  blockIdx.x * blockDim.x *
-blockDim.y + blockIdx.y * blockDim.x * blockDim.y * gridDim.x;
+int idx = threadIdx.x + blockDim.x* blockIdx.x
+int idy = threadIdx.y + blockDim.y* blockIdx.y
+
+int totalwidth = blockDim.y * gridDim.y
+int index = idx + idy * totalwidth
+
 
 QUESTION 4: What happens if you use too many threads per block?
 
