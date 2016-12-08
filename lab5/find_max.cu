@@ -23,9 +23,25 @@ void launch_cuda_kernel(int *data, int N)
 	// Dummy launch
 	dim3 dimBlock( 8, 1 );
 	dim3 dimGrid( 8, 1 );
-	find_max<<<dimGrid, dimBlock>>>(devdata, N);
+	
+    // Time the computation
+    cudaEvent_t start, end;
+    cudaEventCreate(&start);
+    cudaEventCreate(&end);
+
+    cudaEventRecord(start,0);
+    cudaEventSynchronize(start);
+    find_max<<<dimGrid, dimBlock>>>(devdata, N);
 	cudaError_t err = cudaPeekAtLastError();
 	if (err) printf("cudaPeekAtLastError %d %s\n", err, cudaGetErrorString(err));
+
+    // Synchronize and get the time between start - end
+    cudaEventRecord(end,0);
+    cudaEventSynchronize(end);
+    float time_elapsed;
+    cudaEventElapsedTime(&time_elapsed, start, end);
+    printf("Time elapsed(CUDA): %f ms\n", time_elapsed);
+
 
 	// Only the result needs copying!
 	cudaMemcpy(data, devdata, sizeof(int), cudaMemcpyDeviceToHost );
