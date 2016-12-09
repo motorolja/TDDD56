@@ -1,9 +1,6 @@
 ## Package configuration
 CONFIG = RELEASE
 
-## Default number of threads
-NB_THREADS = 1
-
 ## List of C++ files that hold your implementation of parallel sort
 ## Files must have etension .cpp
 SORT_CXX_FILES = sort.cpp
@@ -14,16 +11,16 @@ SORT_CC_FILES =
 ## Additional compiler flag to pass to C-compiled sources
 CFLAGS = 
 ## Additional compiler flags to pass to C++-compiled sources
-CXXFLAGS = -O2 -Wall -pthread
+CXXFLAGS = -std=c++11 -Wall
 ## Additional linker flags
-CXX_LDFLAGS = 
+CXX_LDFLAGS = -lpthread -lrt
 
 ## Number of threads to compile
-NB_THREADS = 1
+NB_THREADS = 4
 
 ## Task graph description
-DRAKE_TASKGRAPH = merge.graphml
+DRAKE_TASKGRAPH = merge-4.graphml
 ## Drake target paltform description
-DRAKE_PLATFORM = platform.dat
+DRAKE_PLATFORM = platform-4.dat
 ## Drake schedule to use
-DRAKE_SCHEDULE = ## Let lpt generate a schedule
+DRAKE_SCHEDULE = schedule-4.xml ## Let lpt generate a schedule

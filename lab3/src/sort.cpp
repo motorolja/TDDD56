@@ -5,7 +5,8 @@
 #include <cmath>
 #include "sort.h"
 
-#include <pthread.h>
+#include <pthread.h> // pthreads
+#include <chrono> // for timing
 
 // These can be handy to debug your code through printf. Compile with CONFIG=DEBUG flags and spread debug(var)
 // through your code to display values that may understand better why your code may not work. There are variants
@@ -61,6 +62,15 @@ class DynArray
 		size_t size;
 };
 
+struct quicksort_args_t
+{
+  int* array;
+  size_t size;
+  size_t depth = 1;
+  size_t offset = 0;
+  int id;
+};
+
 static
 void
 cxx_sort(int *array, size_t size)
@@ -101,7 +111,7 @@ size_t quicksort_pick_pivot(int *array, size_t size, size_t offset)
 // * Recursion until array size is 1
 static void sequential_quicksort(int *array, size_t size, size_t offset = 0)
 {
-	int pivot, pivot_count, i;
+    size_t i, pivot_count, pivot;
 	// int *left, *right;
 	size_t left_size = 0, right_size = 0;
 
@@ -113,45 +123,45 @@ static void sequential_quicksort(int *array, size_t size, size_t offset = 0)
 	if(size > 1)
 	{
     pivot = quicksort_pick_pivot(array, size, offset);
-    int counter = 0;
-		for(i = offset, counter = 0; i < size + offset; i++, counter++)
+    size_t counter = 0;
+	for(i = offset, counter = 0; i < size + offset; i++, counter++)
+	{
+		if(array[i] < array[pivot])
 		{
-			if(array[i] < array[pivot])
-			{
-        if (left_size < counter && i > pivot)
-          {
-            std::swap(array[i], array[pivot]);
-            std::swap(array[i], array[pivot+pivot_count]);
-            pivot += 1;
-          }
-				left_size++;
-			}
-			else if(array[i] > array[pivot])
-			{
-        if (i < pivot)
-          {
-            std::swap(array[i], array[pivot+pivot_count]);
-            if ( i != pivot -1)
-              {
-                std::swap(array[i],array[pivot-1]);
-                pivot -= 1;
-              }
-            else
-              {
-                pivot = i;
-              }
-          }
-				right_size++;
-			}
-			else
-			{
-				pivot_count++;
-			}
-		}
+          if (left_size < counter && i > pivot)
+            {
+              std::swap(array[i], array[pivot]);
+              std::swap(array[i], array[pivot+pivot_count]);
+              pivot += 1;
+            }
+      			left_size++;
+      		}
+      		else if(array[i] > array[pivot])
+      		{
+          if (i < pivot)
+            {
+              std::swap(array[i], array[pivot+pivot_count]);
+              if ( i != pivot -1)
+                {
+                  std::swap(array[i],array[pivot-1]);
+                  pivot -= 1;
+                }
+              else
+                {
+                  pivot = i;
+                }
+            }
+      			right_size++;
+      		}
+      		else
+      		{
+      			pivot_count++;
+      		}
+      }
 
-		// Recurse
-		sequential_quicksort(array, left_size, offset);
-		sequential_quicksort(array, right_size, right_size + pivot_count + offset);
+ 	  // Recurse
+	  sequential_quicksort(array, left_size, offset);
+	  sequential_quicksort(array, right_size, right_size + pivot_count + offset);
 	}
 	else
 	{
@@ -159,19 +169,11 @@ static void sequential_quicksort(int *array, size_t size, size_t offset = 0)
 	}
 }
 
-struct quicksort_args_t
-{
-  int* array;
-  size_t size;
-  size_t depth = 1;
-  size_t offset = 0;
-  int id;
-};
 
-static void parallel_quicksort(void* arg)
+static void* parallel_quicksort(void* arg)
 {
   quicksort_args_t *args = (quicksort_args_t*)arg;
-  int pivot, pivot_count, i;
+  size_t pivot, pivot_count, i;
 	// int *left, *right;
 	size_t left_size = 0, right_size = 0, depth = args->depth;
 
@@ -183,7 +185,7 @@ static void parallel_quicksort(void* arg)
 	if(args->size > 1)
     {
       pivot = quicksort_pick_pivot(args->array, args->size, args->offset);
-      int counter;
+      size_t counter;
       for(i = args->offset, counter = 0; i < args->size + args->offset; i++, counter++)
         {
           if(args->array[i] < args->array[pivot])
@@ -232,14 +234,14 @@ static void parallel_quicksort(void* arg)
       // I will only create exactly NB_THREADS as maximum if depth is deep enough
       if (NB_THREADS > 1 && next_tid <= NB_THREADS)
         {
-          quicksort_args_t *left_args = new quicksort_args_t();
+          quicksort_args_t* left_args = new quicksort_args_t();
           left_args->array = args->array;
           left_args->size = left_size;
           left_args->depth = depth;
           left_args->offset = args->offset;
           left_args->id = args->id;
 
-          quicksort_args_t *right_args = new quicksort_args_t();
+          quicksort_args_t* right_args = new quicksort_args_t();
           right_args->array = args->array;
           right_args->size = right_size;
           right_args->depth = depth;
@@ -247,11 +249,10 @@ static void parallel_quicksort(void* arg)
           right_args->id = next_tid;
 
           pthread_t thread_right;
-          pthread_attr_t attr;
 
-          printf("Started new thread %d, at depth %d\n", next_tid, depth);
-          pthread_create(&thread_right, &attr, parallel_quicksort, (void*)right_args);
-          parallel_quicksort((void*)left_args);
+          //printf("Started new thread %d, at depth %d\n", next_tid, depth);
+          pthread_create(&thread_right, NULL, parallel_quicksort, right_args);
+          parallel_quicksort(left_args);
 
           pthread_join(thread_right, NULL);
 
@@ -264,6 +265,7 @@ static void parallel_quicksort(void* arg)
           sequential_quicksort(args->array, right_size, right_size + pivot_count + args->offset);
         }
    }
+    return NULL;
 }
 
 // This is used as sequential sort in the pipelined sort implementation with drake (see merge.c)
