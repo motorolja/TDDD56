@@ -121,81 +121,77 @@ drake_run(task_t *task)
 
 
 	// Merge as much as you can here
-  while(1)
+    if (parent_size > 0)
     {
-      if (parent_size <= 0 || parent_pushed > parent_size-1)
+        while( parent_pushed < parent_size
+                && right_size > right_consumed 
+                && left_size > left_consumed
+             )
         {
-          break;
-        }
-
-      if (right_size <= right_consumed && left_size <= left_consumed)
-        {
-          break;
-        }
-      // check left child
-      if (left[left_consumed] < right[right_consumed])
-        {
-          // push new parent and increment counters
-          parent[parent_pushed] = left[left_consumed];
-          left_consumed++;
-          parent_pushed++;
-        }
-      // check right child
-      else
-        {
-          // push new parent and increment counters
-          parent[parent_pushed] = right[right_consumed];
-          right_consumed++;
-          parent_pushed++;
-        }
-
-    }
-
-  // check for crashes - do I really need this? does not the other while true catch this?
-  if (drake_task_killed(left_link->prod))
-    {
-      while(right_consumed < right_size && parent_pushed < parent_size)
-        {
-          if (parent_pushed > parent_size-1)
+          // check left child
+          if (left[left_consumed] < right[right_consumed])
             {
-              break;
+              // push new parent and increment counters
+              parent[parent_pushed] = left[left_consumed];
+              left_consumed++;
+              parent_pushed++;
             }
-          // push new parent and increment counters
-          parent[parent_pushed] = right[right_consumed];
-          right_consumed++;
-          parent_pushed++;
-        }
-    }
-
-  if (drake_task_killed(right_link->prod))
-    {
-      while(left_consumed < left_size && parent_pushed < parent_size)
-        {
-          if (parent_pushed > parent_size-1)
+          // check right child
+          else
             {
-              break;
+              // push new parent and increment counters
+              parent[parent_pushed] = right[right_consumed];
+              right_consumed++;
+              parent_pushed++;
             }
-          // push new parent and increment counters
-          parent[parent_pushed] = left[left_consumed];
-          left_consumed++;
-          parent_pushed++;
+    
         }
-    }
-  
-
-	// Write the number of element you consumed from left child and right child into left_consumed and right_consumed, respectively
-	// and the total number of elements you pushed toward parent in parent_pushed
-
-    //  debug_int(parent_size);
-    //  debug_int(parent_pushed);
-    //  debug_int(left_consumed);
-    //  debug_int(right_consumed);
-	// Now discarding input consumed and pushed output produced through channels and using the number of elements consumed and produced
-	// that you set above.
-	pelib_cfifo_discard(int)(left_link->buffer, left_consumed);
-	pelib_cfifo_discard(int)(right_link->buffer, right_consumed);
-	pelib_cfifo_fill(int)(parent_link->buffer, parent_pushed);
-
+    
+      // check for crashes - do I really need this? does not the other while true catch this?
+      if ( left_link->prod == NULL || drake_task_killed(left_link->prod))
+        {
+          while(right_consumed < right_size && parent_pushed < parent_size)
+            {
+              if (parent_pushed > parent_size-1)
+                {
+                  break;
+                }
+              // push new parent and increment counters
+              parent[parent_pushed] = right[right_consumed];
+              right_consumed++;
+              parent_pushed++;
+            }
+        }
+    
+      if (right_link->prod == NULL || drake_task_killed(right_link->prod))
+        {
+          while(left_consumed < left_size && parent_pushed < parent_size)
+            {
+              if (parent_pushed > parent_size-1)
+                {
+                  break;
+                }
+              // push new parent and increment counters
+              parent[parent_pushed] = left[left_consumed];
+              left_consumed++;
+              parent_pushed++;
+            }
+        }
+      
+    
+    	// Write the number of element you consumed from left child and right child into left_consumed and right_consumed, respectively
+    	// and the total number of elements you pushed toward parent in parent_pushed
+    
+        //  debug_int(parent_size);
+        //  debug_int(parent_pushed);
+        //  debug_int(left_consumed);
+        //  debug_int(right_consumed);
+    	// Now discarding input consumed and pushed output produced through channels and using the number of elements consumed and produced
+    	// that you set above.
+    	pelib_cfifo_discard(int)(left_link->buffer, left_consumed);
+    	pelib_cfifo_discard(int)(right_link->buffer, right_consumed);
+    	pelib_cfifo_fill(int)(parent_link->buffer, parent_pushed);
+     }
     return drake_task_depleted(task);
 //  if (drake_task_depleted(task))
 //    {
