@@ -80,14 +80,14 @@ cxx_sort(int *array, size_t size)
 }
 
 // could do a random picking as well but oh well, this should be good enough
-size_t quicksort_pick_pivot(int *array, size_t size)
+size_t quicksort_pick_pivot(int *array, size_t size, size_t offset)
 {
   size_t result = 0;
   // if we only have 2 elements just pick the first.
-  if ( size > 1)
+  if ( size > 2)
     {
       // compare first, middle and last elements and swap them to be internaly sorted
-      size_t first = 0, middle = (size/2), last = size - 1;
+      size_t first = offset, middle = (size/2) + offset, last = size - 1 + offset;
       // The result is the median value of the three but it will always be in the middle
       result = middle;
       if (array[first] > array[last])
@@ -104,15 +104,15 @@ size_t quicksort_pick_pivot(int *array, size_t size)
         }
     }
 
-  return array[result];
+  return result;
 }
 
 // A very simple quicksort implementation
 // * Recursion until array size is 1
-static void sequential_quicksort(int *array, size_t size)
+static void sequential_quicksort(int *array, size_t size, size_t offset = 0)
 {
     int i, pivot_count, pivot;
-	int *left, *right;
+	// int *left, *right;
 	size_t left_size = 0, right_size = 0;
 
 	pivot_count = 0;
@@ -122,43 +122,46 @@ static void sequential_quicksort(int *array, size_t size)
 	// then tune the threshold value
 	if(size > 1)
 	{
-        left = (int*)malloc(size * sizeof(int));
-        right = (int*)malloc(size * sizeof(int));
-    
-        pivot = quicksort_pick_pivot(array, size);
-	    for(i = 0; i < size; i++)
-	    {
-            if(array[i] < pivot)
+    pivot = quicksort_pick_pivot(array, size, offset);
+    size_t counter = 0;
+	for(i = offset, counter = 0; i < size + offset; i++, counter++)
+	{
+		if(array[i] < array[pivot])
+		{
+          if (left_size < counter && i > pivot)
             {
-                left[left_size] = array[i];
-                left_size++;
+              std::swap(array[i], array[pivot]);
+              std::swap(array[i], array[pivot+pivot_count]);
+              pivot += 1;
             }
-            else if(array[i] > pivot)
+      	    left_size++;
+      	}
+      	else if(array[i] > array[pivot])
+      	{
+          if (i < pivot)
             {
-                right[right_size] = array[i];
-                right_size++;
+              std::swap(array[i], array[pivot+pivot_count]);
+              if ( i != pivot -1)
+                {
+                  std::swap(array[i],array[pivot-1]);
+                  pivot -= 1;
+                }
+              else
+                {
+                  pivot = i;
+                }
             }
-            else
-            {
-                pivot_count++;
-            }
-        }
+      		right_size++;
+      	}
+      	else
+      	{
+      		pivot_count++;
+      	}
+      }
 
  	  // Recurse
-	  sequential_quicksort(left, left_size);
-	  sequential_quicksort(right, right_size);
-
-      // Merge
-      memcpy(array, left, left_size * sizeof(int));
-      for(i = left_size; i < left_size + pivot_count; i++)
-      {
-          array[i] = pivot;
-      }
-      memcpy(array + left_size + pivot_count, right, right_size * sizeof(int));
-
-      // Free
-      free(left);
-      free(right);
+	  sequential_quicksort(array, left_size, offset);
+	  sequential_quicksort(array, right_size, right_size + pivot_count + offset);
 	}
 	else
 	{
@@ -169,9 +172,9 @@ static void sequential_quicksort(int *array, size_t size)
 
 static void* parallel_quicksort(void* arg)
 {
-    quicksort_args_t *args = (quicksort_args_t*)arg;
-    int pivot, pivot_count, i;
-	int *left, *right;
+  quicksort_args_t *args = (quicksort_args_t*)arg;
+  size_t pivot, pivot_count, i;
+	// int *left, *right;
 	size_t left_size = 0, right_size = 0, depth = args->depth;
 
 	pivot_count = 0;
@@ -181,27 +184,42 @@ static void* parallel_quicksort(void* arg)
 	// then tune the threshold value
 	if(args->size > 1)
     {
-      pivot = quicksort_pick_pivot(args->array, args->size);
-      left = (int*)malloc(args->size * sizeof(int));
-      right = (int*)malloc(args->size * sizeof(int));
-   
-      for(i = 0; i < args->size; i++)
+      pivot = quicksort_pick_pivot(args->array, args->size, args->offset);
+      size_t counter;
+      for(i = args->offset, counter = 0; i < args->size + args->offset; i++, counter++)
         {
-           if(args->array[i] < pivot)
+          if(args->array[i] < args->array[pivot])
             {
-                left[left_size] = args->array[i];
-                left_size++;
+              if (left_size < counter && i > pivot)
+                {
+                  std::swap(args->array[i], args->array[pivot]);
+                  std::swap(args->array[i], args->array[pivot+pivot_count]);
+                  pivot += 1;
+                }
+              left_size++;
             }
-            else if(args->array[i] > pivot)
+          else if(args->array[i] > args->array[pivot])
             {
-                right[right_size] = args->array[i];
-                right_size++;
+              if (i < pivot)
+                {
+                  std::swap(args->array[i], args->array[pivot+pivot_count]);
+                  if ( i != pivot -1)
+                    {
+                      std::swap(args->array[i], args->array[pivot-1]);
+                      pivot -= 1;
+                    }
+                  else
+                    {
+                      pivot = i;
+                    }
+                }
+              right_size++;
             }
-            else
+          else
             {
-                pivot_count++;
+              pivot_count++;
             }
-     }
+        }
 
       // Recurse
 
@@ -217,15 +235,17 @@ static void* parallel_quicksort(void* arg)
       if (NB_THREADS > 1 && next_tid <= NB_THREADS)
         {
           quicksort_args_t* left_args = new quicksort_args_t();
-          left_args->array = left;
+          left_args->array = args->array;
           left_args->size = left_size;
           left_args->depth = depth;
+          left_args->offset = args->offset;
           left_args->id = args->id;
 
           quicksort_args_t* right_args = new quicksort_args_t();
-          right_args->array = right;
+          right_args->array = args->array;
           right_args->size = right_size;
           right_args->depth = depth;
+          right_args->offset = right_size + pivot_count + args->offset;
           right_args->id = next_tid;
 
           pthread_t thread_right;
@@ -241,22 +261,11 @@ static void* parallel_quicksort(void* arg)
          }
       else
         {
-          sequential_quicksort(left, left_size);
-          sequential_quicksort(right, right_size);
+          sequential_quicksort(args->array, left_size);
+          sequential_quicksort(args->array, right_size, right_size + pivot_count + args->offset);
         }
-      // Merge
-      memcpy(args->array, left, left_size * sizeof(int));
-      for(i = left_size; i < left_size + pivot_count; i++)
-      {
-          args->array[i] = pivot;
-      }
-      memcpy(args->array + left_size + pivot_count, right, right_size * sizeof(int));
-
-      // Free
-      free(left);
-      free(right);
    }
-   return NULL;
+    return NULL;
 }
 
 // This is used as sequential sort in the pipelined sort implementation with drake (see merge.c)
@@ -281,6 +290,8 @@ sort(int* array, size_t size)
 	// routines (qsort, std::sort, std::merge, etc). It's more interesting to learn by writing it yourself.
 
 
+  sequential_quicksort(array, size);
+/*
 	// Reproduce this structure here and there in your code to compile sequential or parallel versions of your code.
 #if NB_THREADS == 0
 	// Some sequential-specific sorting code
@@ -297,6 +308,6 @@ sort(int* array, size_t size)
   parallel_quicksort(args);
   delete(args);
 #endif // #if NB_THREADS
-
+*/
 }
 
