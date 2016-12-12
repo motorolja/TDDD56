@@ -3,7 +3,7 @@
 ## Compile settings
 compile=(nb_threads pattern size value input_instance)
 ## Number of threads: reduce to 1 to 4 threads if you work in Southfork
-nb_threads="seq 1 4"
+nb_threads="seq 2 3 4"
 ## Input data pattern
 pattern="uniform-random increasing decreasing constant"
 ## Input data size: from 16 to 64 Mi integers
