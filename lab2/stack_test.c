@@ -135,11 +135,11 @@ test_teardown()
   // Do not forget to free your stacks after each test
   // to avoid memory leaks
   // just iterate through the stack and free all.
-  stack_element_t* tmp;
   while (stack->head != NULL)
     {
+      stack_element_t* tmp;
       tmp = stack_pop(stack);
-      free(tmp);
+      //free(tmp);
     }
   free(stack);
 }
@@ -157,16 +157,13 @@ test_push_safe()
   // several threads push concurrently to it
   int i;
   // get the thread id
-  unsigned int start, end, iterations = 20;
+  int iterations = 20;
   unsigned int tid = (unsigned int)pthread_self();
   // add some constant dependent on tid
-  start = (unsigned int)tid * 100;
-  end = start + iterations;
   for (i = 0; i < iterations; ++i)
     {
-      stack_element_t* new_ele = malloc(sizeof(stack_element_t));
-      new_ele->value = start+i;
-      stack_push(stack, new_ele);
+      pool[i].value = tid;
+      stack_push(stack, &pool[i]);
     }
 
   // check if the stack is in a consistent state
@@ -176,18 +173,23 @@ test_push_safe()
   // (this is to be updated as your stack design progresses)
   // iterate through the stack and see if there are 20 values with the threads id
 
-  int result;
+  int result = 1;
   unsigned int counter = 0;
+  if (stack == NULL || stack->head == NULL) 
+  {
+	  return 0;
+  }
   stack_element_t* current_ele = stack->head;
-  for (i = 0; i < iterations * NB_THREADS; ++i)
+  for (i = 0; i < iterations; ++i)
     {
       // if we have not pushed all elements to the stack (race condition)
       if (current_ele == NULL)
         {
           result = 0;
+	  break;
         }
       // if we find a value added by this thread increment counter
-      else if (current_ele->value >= start && current_ele->value <= end)
+      else if (current_ele->value == tid)
         {
           counter++;
           if (counter == iterations)
@@ -212,11 +214,10 @@ test_pop_safe()
   // add some constant dependent on tid
   start = (unsigned int)tid * 100;
   end = start + iterations;
-  stack_element_t* tmp;
   for (i = 0; i < iterations; ++i)
     {
+      stack_element_t* tmp;
       tmp = stack_pop(stack);
-      free(tmp);
     }
   // check if the stack is in a consistent state
   stack_check(stack);
@@ -280,14 +281,14 @@ thread_test_aba(void* arg)
   //    Thread 2 runs pop() again without getting preemted, the stack is now top -> 3
   //    Thread 2 pushes 1 back to the stack without getting preemted, the stack is now top -> 1 -> 3
   //    Thread 1 is allowed to run now and compares  1 == 1, which will pass as correct.
-  {
-    stack_element_t *t = stack->head;
-    while (t!=NULL)
-      {
-        //debug_addr(t);
-        t = t->next;
-      }
-  }
+//  {
+//    stack_element_t *t = stack->head;
+//    while (t!=NULL)
+//      {
+//        //debug_addr(t);
+//        t = t->next;
+//      }
+//  }
  if (args->id == 0)
     {
       // thread 1
@@ -356,20 +357,22 @@ test_aba()
     Will trigger the ABA problem
    */
   // Fill the stack with 1,2,3 sequentially
-  int i;
-  for (i = 1; i < 4; ++i)
-    {
-      stack_element_t* new_ele = malloc(sizeof(stack_element_t));
-      new_ele->value = i;
-      stack_push(stack, new_ele);
-    }
+  stack_element_t* new_ele1 = malloc(sizeof(stack_element_t));
+  new_ele1->value = 1;
+  stack_push(stack, new_ele1);
+  stack_element_t* new_ele2 = malloc(sizeof(stack_element_t));
+  new_ele2->value = 2;
+  stack_push(stack, new_ele2);
+  stack_element_t* new_ele3 = malloc(sizeof(stack_element_t));
+  new_ele3->value = 3;
+  stack_push(stack, new_ele3);
   // create the threads
   pthread_t thread[ABA_NB_THREADS];
   pthread_attr_t attr;
   struct thread_test_aba_args_t args[ABA_NB_THREADS];
   pthread_mutexattr_t mutex_attr;
 
-  test_setup();
+  //test_setup();
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE); 
   pthread_mutexattr_init(&mutex_attr);
@@ -377,6 +380,8 @@ test_aba()
   pthread_mutex_init(&aba_mutex1, &mutex_attr);
   pthread_mutex_init(&aba_mutex2, &mutex_attr);
   pthread_barrier_init(&barr, NULL, 2);
+
+  int i;
   for (i = 0; i < ABA_NB_THREADS; i++)
     {
       args[i].id = i;
@@ -390,12 +395,17 @@ test_aba()
   //printf("stack: %d\n", stack->head->value);
   if (stack->head != NULL)
     {
+      free(new_ele1);
+      free(new_ele2);
+      free(new_ele3);
       printf("Implementation is affected by aba\n");
       // implementation is affected by aba
       return 0;
     }
-
-  return 1;
+   free(new_ele1);
+   free(new_ele2);
+   free(new_ele3);
+   return 1;
 #else
   // No ABA is possible with lock-based synchronization. Let the test succeed only
   return 1;
