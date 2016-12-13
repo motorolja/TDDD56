@@ -1,0 +1,17 @@
+Question 1: How is the communication between the host and the graphic card handled?
+
+Question 2: What function executes your kernel?
+
+Question 3: How does the kernel know what element to work on?
+
+QUESTION 4: How much data did you put in local (shared memory?
+
+QUESTION 5: How much data does each thread copy to local memory?
+
+QUESTION 6: How did you handle the necessary overlap between the work groups?
+
+QUESTION 7: If we would like to increase the block size, about how big work groups would be safe to use in this case? Why?
+
+QUESTION 8: How much speedup did you get over the naive version?
+
+
