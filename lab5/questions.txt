@@ -51,4 +51,6 @@ CPU: 0.091544
 GPU: 0.074591
 speedup 1.2
 
+Parallized CPU version would be better than the sequential but it would still be slower for big enough N
+
 Note to self, not on a lab computer but a faster one.
