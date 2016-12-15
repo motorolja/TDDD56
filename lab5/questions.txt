@@ -30,4 +30,25 @@ we cannot synchronize the threads of different blocks. To solve this we
 
 QUESTION 7: What time do you get? Difference to the CPU? What is the break even size? What can you expect for a parallel CPU version? (Your conclusions here may vary between the labs.)
 
+Dimension N x N
+
+N = 1048576
+CPU: 0.996865
+GPU: 0.096088
+speedup 10x
+
+N = 1024
+CPU: 0.000266
+GPU: 0.072229
+
+
+N = 65536
+CPU: 0.040735
+GPU: 0.074636
+
+N = 131072
+CPU: 0.091544
+GPU: 0.074591
+speedup 1.2
+
 Note to self, not on a lab computer but a faster one.
