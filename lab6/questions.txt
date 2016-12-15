@@ -1,10 +1,18 @@
 Question 1: How is the communication between the host and the graphic card handled?
 
+Through buffers and command queues.
+
 Question 2: What function executes your kernel?
+clEnqueueNDRangeKernel
 
 Question 3: How does the kernel know what element to work on?
 
+Through:
+size_t get_global_id(uint dimindx);
+
 QUESTION 4: How much data did you put in local (shared memory?
+
+
 
 QUESTION 5: How much data does each thread copy to local memory?
 
