@@ -3,13 +3,53 @@
 #include <stdio.h>
 #include "milli.c"
 
+//#define SIZE 100000
+#define SIZE 200000000
+//#define SIZE 16
+
 __global__ void find_max(int *data, int N)
 {
-  int i;
-  i = threadIdx.x + blockDim.x*blockIdx.x;
 
+  int idx;
+  idx = threadIdx.x + blockDim.x*blockIdx.x;
 	// Write your CUDA kernel here
+  // max = first int in our range
+  int local_max = data[idx];
+  for (int i = 0; i < N; i++)
+    {
+      if (data[idx + i] > local_max)
+        local_max = data[idx + i];
+    }
+  data[idx] = local_max;
+
+  __syncthreads();
+  // master thread synch all local max data in the block and the get biggest
+  // This way we may get it later
+
+  if (threadIdx.x == 0)
+    {
+      for (int i = 0; i < blockDim.x; i++)
+        {
+          if (data[idx + i * N] > local_max)
+            local_max = data[idx + i * N];
+        }
+      data[idx] = local_max;
+    }
 }
+
+// TODO: needs to consider outliers to be accurate..
+void set_max_block(int* data, int grid_size, int block_size, int N)
+{
+  // init to first found max block value
+  int local_max = data[0];
+  for (int i = 0; i < grid_size; i++)
+    {
+      if (data[i * block_size * N] > local_max)
+        local_max = data[i * block_size * N];
+    }
+  data[0] = local_max;
+}
+
 
 void launch_cuda_kernel(int *data, int N)
 {
@@ -20,32 +60,20 @@ void launch_cuda_kernel(int *data, int N)
 	cudaMalloc( (void**)&devdata, size);
 	cudaMemcpy(devdata, data, size, cudaMemcpyHostToDevice );
 
-	// Dummy launch
-	dim3 dimBlock( 8, 1 );
-	dim3 dimGrid( 8, 1 );
-	
-    // Time the computation
-    cudaEvent_t start, end;
-    cudaEventCreate(&start);
-    cudaEventCreate(&end);
-
-    cudaEventRecord(start,0);
-    cudaEventSynchronize(start);
-    find_max<<<dimGrid, dimBlock>>>(devdata, N);
-	cudaError_t err = cudaPeekAtLastError();
-	if (err) printf("cudaPeekAtLastError %d %s\n", err, cudaGetErrorString(err));
-
-    // Synchronize and get the time between start - end
-    cudaEventRecord(end,0);
-    cudaEventSynchronize(end);
-    float time_elapsed;
-    cudaEventElapsedTime(&time_elapsed, start, end);
-    printf("Time elapsed(CUDA): %f ms\n", time_elapsed);
-
+  int block_size = 16, grid_size = 8;
+  // Dummy launch
+  dim3 dimBlock( block_size, 1 );
+  dim3 dimGrid( grid_size, 1 );
+  int nr_of_ints_thread = SIZE / grid_size / block_size;
+  find_max<<<dimGrid, dimBlock>>>(devdata, nr_of_ints_thread);
+  cudaThreadSynchronize();
+  cudaError_t err = cudaPeekAtLastError();
+  if (err) printf("cudaPeekAtLastError %d %s\n", err, cudaGetErrorString(err));
 
 	// Only the result needs copying!
 	cudaMemcpy(data, devdata, sizeof(int), cudaMemcpyDeviceToHost );
 	cudaFree(devdata);
+  //  set_max_block(data, grid_size, block_size, nr_of_ints_thread);
 }
 
 // CPU max finder (sequential)
@@ -62,8 +90,6 @@ void find_max_cpu(int *data, int N)
 	data[0] = m;
 }
 
-#define SIZE 1024
-//#define SIZE 16
 // Dummy data in comments below for testing
 int data[SIZE];// = {1, 2, 5, 3, 6, 8, 5, 3, 1, 65, 8, 5, 3, 34, 2, 54};
 int data2[SIZE];// = {1, 2, 5, 3, 6, 8, 5, 3, 1, 65, 8, 5, 3, 34, 2, 54};

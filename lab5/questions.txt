@@ -1,0 +1,33 @@
+QUESTION 1: What timing did you get for your GPU reduction? Compare it to the CPU version.
+
+#define SIZE 200000000
+
+CPU time 0.512086
+GPU time 0.482870
+
+
+QUESTION 2: Try larger data size. On what size does the GPU version get faster, or at least comparable, to the GPU?
+
+Around SIZE 200 000 000
+
+QUESTION 3: How can you optimize this further? You should know at least one way.
+
+Using shared memory for each block
+
+QUESTION 4: Should each thread produce one output or two? Why?
+
+Half of the threads produce two results and the other half do not produce
+a result
+
+
+QUESTION 5: How many items can you handle in one block?
+
+2048 if all 1024 threads produce a result.
+
+QUESTION 6: What problem must be solved when you use more than one block? How did you solve it?
+
+we cannot synchronize the threads of different blocks. To solve this we 
+
+QUESTION 7: What time do you get? Difference to the CPU? What is the break even size? What can you expect for a parallel CPU version? (Your conclusions here may vary between the labs.)
+
+Note to self, not on a lab computer but a faster one.
