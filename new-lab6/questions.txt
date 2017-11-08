@@ -1,0 +1,36 @@
+Question 1: How is the communication between the host and the graphic card handled?
+
+Through buffers and command queues.
+
+Question 2: What function executes your kernel?
+clEnqueueNDRangeKernel
+
+Question 3: How does the kernel know what element to work on?
+
+Through:
+size_t get_global_id(uint dimindx);
+
+QUESTION 4: How much data did you put in local (shared memory?
+
+old ans: 64 * KERNELS * 2  pixels (x3 for RGB)
+
+QUESTION 5: How much data does each thread copy to local memory?
+
+old ans: 2 pixels
+
+QUESTION 6: How did you handle the necessary overlap between the work groups?
+
+
+
+old ans: 
+index depend on the local id i.e. 
+get_local_id(0) = x 
+get_local_id(1) = y
+
+QUESTION 7: If we would like to increase the block size, about how big work groups would be safe to use in this case? Why?
+
+
+
+QUESTION 8: How much speedup did you get over the naive version?
+
+
