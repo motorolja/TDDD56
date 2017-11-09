@@ -151,7 +151,7 @@ void computeImages()
   ciErrNum = clEnqueueNDRangeKernel(commandQueue, theKernel, 2, NULL, &globalWorkSize[0], &localWorkSize[0], 0, NULL, &event);
   printCLError(ciErrNum,9);
 
-   ciErrNum = clWaitForEvents(1, &event); // Synch
+  ciErrNum = clWaitForEvents(1, &event); // Synch
   printCLError(ciErrNum,10);
   printf("time %lf\n", GetSeconds());
 
