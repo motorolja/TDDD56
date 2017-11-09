@@ -3,39 +3,66 @@
  */
 
 #define KERNELSIZE 2
+#define BLOCKS 16
+#define PRELOAD_PIXELS 2
 
-__kernel void filter(__global unsigned char *image, __global unsigned char *out, const unsigned int n, const unsigned int m)
-{ 
+__kernel void filter(
+         __global unsigned char *image,
+         __global unsigned char *out,
+         const unsigned int n,
+         const unsigned int m)
+{
+  // Local storage
+  __local unsigned char *local_pixel_storage[BLOCKS*BLOCKS];
+
+  // Local ids
+  unsigned int local_y = get_local_id(1) % 512;
+  unsigned int local_x = get_local_id(0) % 512;
+  unsigned int local_size = get_local_size(0);
+
+  // Global ids
   unsigned int i = get_global_id(1) % 512;
   unsigned int j = get_global_id(0) % 512;
+
+  // Load pixels into local memory
+  for (uint idx = 0; idx < PRELOAD_PIXELS; ++idx)
+    {
+      for (uint id_rgb = 0; id_rgb < 3; ++id_rgb)
+        {
+          
+        }
+    }
+
   int k, l;
+  int divby = (2*KERNELSIZE+1)*(2*KERNELSIZE+1);
   unsigned int sumx, sumy, sumz;
 
-	int divby = (2*KERNELSIZE+1)*(2*KERNELSIZE+1);
-	
-	if (j < n && i < m) // If inside image
-	{
-		if (i >= KERNELSIZE && i < m-KERNELSIZE && j >= KERNELSIZE && j < n-KERNELSIZE)
-		{
-		// Filter kernel
-			sumx=0;sumy=0;sumz=0;
-			for(k=-KERNELSIZE;k<=KERNELSIZE;k++)
-				for(l=-KERNELSIZE;l<=KERNELSIZE;l++)	
-				{
-					sumx += image[((i+k)*n+(j+l))*3+0];
-					sumy += image[((i+k)*n+(j+l))*3+1];
-					sumz += image[((i+k)*n+(j+l))*3+2];
-				}
-			out[(i*n+j)*3+0] = sumx/divby;
-			out[(i*n+j)*3+1] = sumy/divby;
-			out[(i*n+j)*3+2] = sumz/divby;
-		}
-		else
-		// Edge pixels are not filtered
-		{
-			out[(i*n+j)*3+0] = image[(i*n+j)*3+0];
-			out[(i*n+j)*3+1] = image[(i*n+j)*3+1];
-			out[(i*n+j)*3+2] = image[(i*n+j)*3+2];
-		}
-	}
+  // Ensure all the local pixels are loaded in local memory
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  if (j < n && i < m) // If inside image
+  {
+    if (i >= KERNELSIZE && i < m-KERNELSIZE && j >= KERNELSIZE && j < n-KERNELSIZE)
+    {
+    // Filter kernel
+      sumx=0;sumy=0;sumz=0;
+      for(k=-KERNELSIZE;k<=KERNELSIZE;k++)
+        for(l=-KERNELSIZE;l<=KERNELSIZE;l++)
+        {
+          sumx += image[((i+k)*n+(j+l))*3+0];
+          sumy += image[((i+k)*n+(j+l))*3+1];
+          sumz += image[((i+k)*n+(j+l))*3+2];
+        }
+      out[(i*n+j)*3+0] = sumx/divby;
+      out[(i*n+j)*3+1] = sumy/divby;
+      out[(i*n+j)*3+2] = sumz/divby;
+    }
+    else
+    // Edge pixels are not filtered
+    {
+      out[(i*n+j)*3+0] = image[(i*n+j)*3+0];
+      out[(i*n+j)*3+1] = image[(i*n+j)*3+1];
+      out[(i*n+j)*3+2] = image[(i*n+j)*3+2];
+    }
+  }
 }
