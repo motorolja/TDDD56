@@ -1,0 +1,14 @@
+Question 1.1:
+Why does SkePU have a "fused" MapReduce when there
+already are separate Map and Reduce skeletons?
+Hint: Think about memory access patterns.
+
+Question 1.2:
+Is there any practical reason to ever use separate Map and
+Reduce in sequence?
+
+
+Question 1.3:
+Is there a SkePU backend which is always more efficient
+to use, or does this depend on the problem size?  Why?  Either show with
+measurements or provide a valid reasoning.
