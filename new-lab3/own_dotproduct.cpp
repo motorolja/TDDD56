@@ -34,11 +34,13 @@ int main(int argc, const char* argv[])
 
   /* Skeleton instances */
   auto multiplyMap = skepu2::Map<2>(multiplyFunc);
-  auto addReduce = skepu2::Reduce<1>(addFunc);
-  // ...
+  auto addReduce = skepu2::Reduce(addFunc);
+  auto dotMapReduce = skepu2::MapReduce<2>(addFunc,multiplyFunc);
 
   /* Set backend (important, do for all instances!) */
-  //  instance.setBackend(spec);
+  multiplyMap.setBackend(spec);
+  addReduce.setBackend(spec);
+  dotMapReduce.setBackend(spec);
 
   /* SkePU containers */
   skepu2::Vector<float> v1(size, 1.0f), v2(size, 2.0f), res(size, 2.0f);
@@ -55,7 +57,7 @@ int main(int argc, const char* argv[])
 
   auto timeSep = skepu2::benchmark::measureExecTime([&]
   {
-    // your code here
+    dotMapReduce(v1,v2);
   });
 
   std::cout << "Time Combined: " << (timeComb.count() / 10E6) << " seconds.\n";

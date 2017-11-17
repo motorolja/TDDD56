@@ -3,6 +3,15 @@ Why does SkePU have a "fused" MapReduce when there
 already are separate Map and Reduce skeletons?
 Hint: Think about memory access patterns.
 
+Because if we only have x threads and 4x elements, a thread could
+do mapreduce for 4 elements located in order in memory.
+
+[a,a,a,a,b,b,b,b] Thread a and Thead b allocating 4 elements each.
+
+This means that we do not have to reallocate as much memory as a map + reduce would.
+Map allocates elements for threads and when map is done a reduce would allocate again
+for the threads.
+
 Question 1.2:
 Is there any practical reason to ever use separate Map and
 Reduce in sequence?
